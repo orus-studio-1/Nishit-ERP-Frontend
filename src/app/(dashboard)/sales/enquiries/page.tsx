@@ -1,0 +1,73 @@
+'use client';
+
+import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
+import { ArrowRight, CalendarClock, CirclePlus, FileText, Search, Trash2 } from 'lucide-react';
+import toast from 'react-hot-toast';
+import api from '@/lib/api';
+import { showApiError, showApiSuccess } from '@/lib/apiError';
+import { formatDate } from '@/lib/utils';
+import { PageHeader } from '@/components/shared/PageHeader';
+import { Pagination } from '@/components/shared/Pagination';
+import { StatusBadge } from '@/components/shared/StatusBadge';
+import { SelectEmptyState } from '@/components/shared/SelectEmptyState';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+type EnquiryItemForm = { productId: string; description: string; targetQty: string; targetPrice: string; targetDate: string };
+const emptyItem = (): EnquiryItemForm => ({ productId: '', description: '', targetQty: '1', targetPrice: '', targetDate: '' });
+const inputDateTime = (value?: string) => value ? new Date(value).toLocaleString() : 'Not scheduled';
+
+export default function SalesEnquiriesPage() {
+  const [rows, setRows] = useState<any[]>([]), [customers, setCustomers] = useState<any[]>([]), [products, setProducts] = useState<any[]>([]);
+  const [page, setPage] = useState(1), [total, setTotal] = useState(0), [search, setSearch] = useState(''), [status, setStatus] = useState('ALL');
+  const [isLoading, setIsLoading] = useState(true), [isSaving, setIsSaving] = useState(false), [open, setOpen] = useState(false);
+  const [form, setForm] = useState({ customerId: '', source: 'EMAIL', sourceReference: '', receivedAt: new Date().toISOString().slice(0, 10), requirements: '', targetDate: '', followUpAt: '', currency: 'INR', territory: '', salesChannel: '' });
+  const [items, setItems] = useState<EnquiryItemForm[]>([emptyItem()]);
+  const limit = 20;
+
+  const load = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const response = await api.get('/sales/enquiries', { params: { page, limit, search: search || undefined, status: status === 'ALL' ? undefined : status } });
+      setRows(response.data?.data?.items || []); setTotal(response.data?.data?.total || 0);
+    } catch (error) { showApiError(error, 'Could not load sales enquiries'); }
+    finally { setIsLoading(false); }
+  }, [page, search, status]);
+
+  useEffect(() => { const timer = setTimeout(load, 250); return () => clearTimeout(timer); }, [load]);
+  useEffect(() => { Promise.all([api.get('/customers', { params: { limit: 300, isActive: true } }), api.get('/inventory/products', { params: { limit: 300 } })]).then(([customerResponse, productResponse]) => { setCustomers(customerResponse.data?.data?.items || customerResponse.data?.data || []); setProducts(productResponse.data?.data?.items || []); }).catch(error => showApiError(error, 'Could not load enquiry master data')); }, []);
+
+  const updateItem = (index: number, key: keyof EnquiryItemForm, value: string) => setItems(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, [key]: value } : item));
+  const reset = () => { setForm({ customerId: '', source: 'EMAIL', sourceReference: '', receivedAt: new Date().toISOString().slice(0, 10), requirements: '', targetDate: '', followUpAt: '', currency: 'INR', territory: '', salesChannel: '' }); setItems([emptyItem()]); };
+  const create = async () => {
+    if (!form.customerId) return toast.error('Select a customer');
+    if (!form.requirements.trim()) return toast.error('Enter the customer requirement');
+    const cleanItems = items.filter(item => item.productId).map(item => ({ ...item, targetQty: Number(item.targetQty), targetPrice: item.targetPrice ? Number(item.targetPrice) : undefined, targetDate: item.targetDate || undefined, description: item.description || undefined }));
+    if (!cleanItems.length) return toast.error('Add at least one product');
+    if (cleanItems.some(item => !item.targetQty || item.targetQty <= 0)) return toast.error('Every product requires a quantity greater than zero');
+    setIsSaving(true);
+    try { await api.post('/sales/enquiries', { ...form, sourceReference: form.sourceReference || undefined, receivedAt: form.receivedAt || undefined, targetDate: form.targetDate || undefined, followUpAt: form.followUpAt || undefined, territory: form.territory || undefined, salesChannel: form.salesChannel || undefined, items: cleanItems }); showApiSuccess('Sales enquiry created'); setOpen(false); reset(); setPage(1); await load(); }
+    catch (error) { showApiError(error, 'Could not create enquiry'); }
+    finally { setIsSaving(false); }
+  };
+
+  return <div className="space-y-5">
+    <PageHeader title="Sales Enquiries" description="Capture customer requirements, manage follow-ups and negotiations, then convert qualified enquiries into quotations" action={{ label: 'New Enquiry', onClick: () => setOpen(true), icon: CirclePlus }} />
+    <div className="grid gap-3 sm:grid-cols-3"><Card><CardContent className="pt-5"><p className="text-xs uppercase text-muted-foreground">Enquiries shown</p><p className="mt-1 text-2xl font-semibold">{total}</p></CardContent></Card><Card><CardContent className="pt-5"><p className="text-xs uppercase text-muted-foreground">Follow-ups due</p><p className="mt-1 text-2xl font-semibold text-amber-600">{rows.filter(row => row.followUpAt && new Date(row.followUpAt) <= new Date() && row.followUpStatus !== 'COMPLETED').length}</p></CardContent></Card><Card><CardContent className="pt-5"><p className="text-xs uppercase text-muted-foreground">Ready for quotation</p><p className="mt-1 text-2xl font-semibold text-blue-600">{rows.filter(row => row.status === 'SUBMITTED').length}</p></CardContent></Card></div>
+    <Card><CardContent className="flex flex-col gap-3 pt-5 sm:flex-row"><div className="relative flex-1"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><Input className="pl-9" placeholder="Search enquiry number, customer, requirement or source reference" value={search} onChange={event => { setSearch(event.target.value); setPage(1); }} /></div><Select value={status} onValueChange={value => { setStatus(value); setPage(1); }}><SelectTrigger className="w-full sm:w-52"><SelectValue /></SelectTrigger><SelectContent>{['ALL','DRAFT','SUBMITTED','QUOTED','LOST','CANCELLED'].map(value => <SelectItem key={value} value={value}>{value === 'ALL' ? 'All statuses' : value.replaceAll('_', ' ')}</SelectItem>)}</SelectContent></Select></CardContent></Card>
+    <Card><CardContent className="p-0"><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b bg-muted/40 text-left"><th className="p-3">Enquiry</th><th className="p-3">Customer & requirement</th><th className="p-3">Products</th><th className="p-3">Source</th><th className="p-3">Next follow-up</th><th className="p-3">Status</th><th className="p-3 text-right">Action</th></tr></thead><tbody>{rows.map(row => <tr key={row.id} className="border-b last:border-0 hover:bg-muted/20"><td className="p-3"><Link href={`/sales/enquiries/${row.id}`} className="font-mono font-semibold text-blue-600 hover:underline">{row.enquiryNo}</Link><p className="mt-1 text-xs text-muted-foreground">Received {formatDate(row.receivedAt)}</p></td><td className="max-w-sm p-3"><p className="font-medium">{row.customer?.name}</p><p className="line-clamp-2 text-xs text-muted-foreground">{row.requirements || 'No requirement entered'}</p></td><td className="p-3"><p>{row.items?.length || 0} item(s)</p><p className="text-xs text-muted-foreground">{row.items?.slice(0, 2).map((item: any) => item.product?.name).join(', ')}</p></td><td className="p-3"><p>{row.source}</p><p className="max-w-40 truncate text-xs text-muted-foreground">{row.sourceReference || 'No reference'}</p></td><td className="p-3"><div className="flex items-start gap-2"><CalendarClock className="mt-0.5 h-4 w-4 text-muted-foreground" /><div><p>{inputDateTime(row.followUpAt)}</p><p className="text-xs text-muted-foreground">{row.followUpStatus}</p></div></div></td><td className="p-3"><StatusBadge status={row.status} /></td><td className="p-3 text-right"><Button asChild size="sm" variant="outline"><Link href={`/sales/enquiries/${row.id}`}>Open <ArrowRight className="ml-1 h-4 w-4" /></Link></Button></td></tr>)}{!rows.length && !isLoading && <tr><td colSpan={7} className="p-12 text-center"><FileText className="mx-auto mb-3 h-8 w-8 text-muted-foreground" /><p className="font-medium">No enquiries found</p><p className="text-sm text-muted-foreground">Create a new enquiry or change the current filters.</p></td></tr>}{isLoading && <tr><td colSpan={7} className="p-12 text-center text-muted-foreground">Loading enquiries…</td></tr>}</tbody></table></div></CardContent></Card>
+    {total > limit && <Pagination page={page} totalPages={Math.ceil(total / limit)} total={total} limit={limit} onPageChange={setPage} />}
+
+    <Dialog open={open} onOpenChange={setOpen}><DialogContent className="max-w-5xl"><DialogHeader><DialogTitle>New Sales Enquiry</DialogTitle></DialogHeader><div className="max-h-[78vh] space-y-5 overflow-y-auto pr-2">
+      <section><h3 className="mb-3 font-medium">Customer and source</h3><div className="grid gap-3 md:grid-cols-3"><div className="space-y-1.5"><Label>Customer *</Label><Select value={form.customerId} onValueChange={customerId => { const customer = customers.find(item => item.id === customerId); setForm({ ...form, customerId, currency: customer?.currency || form.currency }); }}><SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger><SelectContent>{customers.length ? customers.map(customer => <SelectItem key={customer.id} value={customer.id}>{customer.name}</SelectItem>) : <SelectEmptyState message="No customers found" linkHref="/customers" linkText="Create Customer" />}</SelectContent></Select></div><div className="space-y-1.5"><Label>Source *</Label><Select value={form.source} onValueChange={source => setForm({ ...form, source })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{['EMAIL','WHATSAPP','PHONE','WEB','REFERRAL','MANUAL'].map(value => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select></div><div className="space-y-1.5"><Label>Source reference</Label><Input placeholder="Email subject, WhatsApp ID or reference" value={form.sourceReference} onChange={event => setForm({ ...form, sourceReference: event.target.value })} /></div><div className="space-y-1.5"><Label>Received date</Label><Input type="date" value={form.receivedAt} onChange={event => setForm({ ...form, receivedAt: event.target.value })} /></div><div className="space-y-1.5"><Label>Next follow-up</Label><Input type="datetime-local" value={form.followUpAt} onChange={event => setForm({ ...form, followUpAt: event.target.value })} /></div><div className="space-y-1.5"><Label>Overall target date</Label><Input type="date" value={form.targetDate} onChange={event => setForm({ ...form, targetDate: event.target.value })} /></div></div></section>
+      <section><Label>Customer requirement *</Label><textarea className="mt-1 min-h-24 w-full rounded-md border p-3 text-sm" placeholder="Describe specifications, delivery expectations, commercial requirements and any important context" value={form.requirements} onChange={event => setForm({ ...form, requirements: event.target.value })} /></section>
+      <section><div className="mb-3 flex items-center justify-between"><h3 className="font-medium">Requested products</h3><Button size="sm" variant="outline" onClick={() => setItems(current => [...current, emptyItem()])}><CirclePlus className="mr-1 h-4 w-4" /> Add item</Button></div><div className="space-y-3">{items.map((item, index) => <div key={index} className="grid gap-2 rounded-lg border p-3 md:grid-cols-6"><div className="md:col-span-2"><Label>Product *</Label><Select value={item.productId} onValueChange={value => updateItem(index, 'productId', value)}><SelectTrigger><SelectValue placeholder="Select product" /></SelectTrigger><SelectContent>{products.length ? products.map(product => <SelectItem key={product.id} value={product.id}>{product.sku} · {product.name}</SelectItem>) : <SelectEmptyState message="No products found" linkHref="/inventory/products" linkText="Create Product" />}</SelectContent></Select></div><div><Label>Quantity *</Label><Input type="number" min="0.000001" step="any" value={item.targetQty} onChange={event => updateItem(index, 'targetQty', event.target.value)} /></div><div><Label>Target price</Label><Input type="number" min="0" step="0.01" value={item.targetPrice} onChange={event => updateItem(index, 'targetPrice', event.target.value)} /></div><div><Label>Required by</Label><Input type="date" value={item.targetDate} onChange={event => updateItem(index, 'targetDate', event.target.value)} /></div><div className="flex items-end"><Button className="w-full" variant="ghost" disabled={items.length === 1} onClick={() => setItems(current => current.filter((_, itemIndex) => itemIndex !== index))}><Trash2 className="mr-1 h-4 w-4" /> Remove</Button></div><Input className="md:col-span-6" placeholder="Item-specific description or specification" value={item.description} onChange={event => updateItem(index, 'description', event.target.value)} /></div>)}</div></section>
+      <div className="flex justify-end gap-2 border-t pt-4"><Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button disabled={isSaving} onClick={create}>{isSaving ? 'Creating…' : 'Create Enquiry'}</Button></div>
+    </div></DialogContent></Dialog>
+  </div>;
+}
