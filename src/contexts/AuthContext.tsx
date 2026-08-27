@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import api, { setAccessToken } from '@/lib/api';
+import api, { refreshAccessToken, setAccessToken } from '@/lib/api';
 import { User, AuthResponse } from '@/types';
 
 interface AuthContextType {
@@ -53,21 +53,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const savedToken = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-    if (!savedToken) {
-      setUser(null);
-      setToken(null);
-      setIsLoading(false);
-      return;
+    if (savedToken) {
+      setAccessToken(savedToken);
+      setToken(savedToken);
     }
 
-    setAccessToken(savedToken);
-    setToken(savedToken);
-
-    // Validate the token and fetch fresh user access and profile from backend
-    api.get('/auth/me')
+    // Restore from the long-lived HttpOnly refresh session even when the
+    // short-lived access token is absent or expired.
+    const restore = async () => {
+      if (!savedToken) {
+        const refreshedToken = await refreshAccessToken();
+        setToken(refreshedToken);
+      }
+      return api.get('/auth/me');
+    };
+    restore()
       .then((res) => {
         const payload = res.data?.data;
         if (payload) {
+          const currentToken = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+          if (currentToken) setToken(currentToken);
           setUser(payload);
           if (typeof window !== 'undefined') {
             try {
@@ -77,7 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       })
       .catch((err) => {
-        // If 401 Unauthorized or 403 Forbidden, session was revoked or expired
+        // Clear only when the long-lived refresh session is genuinely unavailable
         if (err.response?.status === 401 || err.response?.status === 403) {
           setAccessToken(null);
           setToken(null);

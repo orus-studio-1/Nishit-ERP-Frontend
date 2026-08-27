@@ -7,6 +7,7 @@ const api = axios.create({
 });
 
 let accessToken: string | null = null;
+let refreshPromise: Promise<string> | null = null;
 if (typeof window !== 'undefined') {
   try {
     accessToken = localStorage.getItem('token');
@@ -30,6 +31,20 @@ export const setAccessToken = (token: string | null) => {
   }
 };
 
+export const refreshAccessToken = () => {
+  if (!refreshPromise) {
+    refreshPromise = api.post('/auth/refresh')
+      .then((response) => {
+        const token = response.data?.data?.accessToken || response.data?.data?.token;
+        if (!token) throw new Error('Refresh response did not include an access token');
+        setAccessToken(token);
+        return token as string;
+      })
+      .finally(() => { refreshPromise = null; });
+  }
+  return refreshPromise;
+};
+
 api.interceptors.request.use((config) => {
   const token = accessToken || (typeof window !== 'undefined' ? localStorage.getItem('token') : null);
   if (token) {
@@ -50,13 +65,9 @@ api.interceptors.response.use(
       if (sentToken && !err.config?._retried) {
         err.config._retried = true;
         try {
-          const refreshed = await api.post('/auth/refresh');
-          const newToken = refreshed.data?.data?.accessToken || refreshed.data?.data?.token;
-          if (newToken) {
-            setAccessToken(newToken);
-            err.config.headers.Authorization = `Bearer ${newToken}`;
-            return api.request(err.config);
-          }
+          const newToken = await refreshAccessToken();
+          err.config.headers.Authorization = `Bearer ${newToken}`;
+          return api.request(err.config);
         } catch {
           // Token refresh failed
         }
