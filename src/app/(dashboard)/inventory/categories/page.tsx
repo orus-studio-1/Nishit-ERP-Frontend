@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Plus, Tag } from 'lucide-react';
+import { Plus, Tag, Pencil } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,7 @@ export default function CategoriesPage() {
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ name: '', code: '', parentId: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editing, setEditing] = useState<Category | null>(null);
 
   const fetchCategories = async () => {
     setIsLoading(true);
@@ -56,23 +57,27 @@ export default function CategoriesPage() {
 
     setIsSubmitting(true);
     try {
-      await api.post('/inventory/categories', {
+      const payload = {
         name: trimmedName,
         code: trimmedCode,
         parentId: form.parentId || undefined,
-      });
-      showApiSuccess(`Category "${trimmedName}" created successfully`);
+      };
+      if (editing) await api.put(`/inventory/categories/${editing.id}`, payload); else await api.post('/inventory/categories', payload);
+      showApiSuccess(`Category "${trimmedName}" ${editing ? 'updated' : 'created'} successfully`);
       setShowModal(false);
+      setEditing(null);
       setForm({ name: '', code: '', parentId: '' });
       fetchCategories();
     } catch (err: any) {
-      showApiError(err, 'Failed to create category');
+      showApiError(err, editing ? 'Failed to update category' : 'Failed to create category');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const rootCategories = categories.filter((c) => !c.parentId);
+  const rootCategories = categories.filter((c) => !c.parentId && c.id !== editing?.id);
+  const openCreate = () => { setEditing(null); setForm({ name: '', code: '', parentId: '' }); setShowModal(true); };
+  const openEdit = (category: Category) => { setEditing(category); setForm({ name: category.name || '', code: category.code || '', parentId: category.parentId || '' }); setShowModal(true); };
 
   const columns = [
     {
@@ -103,6 +108,7 @@ export default function CategoriesPage() {
       },
     },
     { key: 'products', header: 'Products', render: (c: Category) => c._count?.products || 0 },
+    { key: 'actions', header: '', render: (c: Category) => <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); openEdit(c); }}><Pencil className="mr-1 h-3.5 w-3.5" />Edit</Button> },
   ];
 
   return (
@@ -110,22 +116,22 @@ export default function CategoriesPage() {
       <PageHeader
         title="Categories"
         description="Organize product categories"
-        action={{ label: 'New Category', onClick: () => setShowModal(true), icon: Plus }}
+        action={{ label: 'New Category', onClick: openCreate, icon: Plus }}
       />
       {categories.length === 0 && !isLoading ? (
         <EmptyState
           icon={Tag}
           title="No categories"
           description="Create your first product category"
-          action={{ label: 'Add Category', onClick: () => setShowModal(true) }}
+          action={{ label: 'Add Category', onClick: openCreate }}
         />
       ) : (
         <DataTable columns={columns} data={categories} isLoading={isLoading} />
       )}
-      <Dialog open={showModal} onOpenChange={setShowModal}>
+      <Dialog open={showModal} onOpenChange={(open) => { setShowModal(open); if (!open) setEditing(null); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>New Category</DialogTitle>
+            <DialogTitle>{editing ? 'Edit Category' : 'New Category'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleCreate} className="space-y-4 mt-2">
             <div className="space-y-1.5">
@@ -170,7 +176,7 @@ export default function CategoriesPage() {
                 Cancel
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Creating...' : 'Create Category'}
+                {isSubmitting ? 'Saving...' : editing ? 'Save Changes' : 'Create Category'}
               </Button>
             </div>
           </form>

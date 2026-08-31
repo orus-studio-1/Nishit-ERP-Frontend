@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Plus, FileText, AlertCircle, ArrowRight } from 'lucide-react';
+import { Plus, FileText, AlertCircle, ArrowRight, Pencil } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
 import { Pagination } from '@/components/shared/Pagination';
@@ -29,6 +29,7 @@ export default function QuotationsPage() {
   const [customers, setCustomers] = useState<any[]>([]);
   const [sourceQuotation, setSourceQuotation] = useState<Quotation | null>(null);
   const [newOpen, setNewOpen] = useState(false);
+  const [editingQuotation, setEditingQuotation] = useState<Quotation | null>(null);
   const [actionDialog, setActionDialog] = useState<{ quotation: Quotation; operation: 'send' | 'reject' } | null>(null);
   const [actionValue, setActionValue] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -162,9 +163,11 @@ export default function QuotationsPage() {
 
     setIsSubmitting(true);
     try {
-      await api.post('/sales/quotations', { ...form, items });
-      showApiSuccess('Quotation created successfully');
+      if (editingQuotation) await api.put(`/sales/quotations/${editingQuotation.id}`, { ...form, items });
+      else await api.post('/sales/quotations', { ...form, items });
+      showApiSuccess(`Quotation ${editingQuotation ? 'updated' : 'created'} successfully`);
       setNewOpen(false);
+      setEditingQuotation(null);
       setForm({
         customerId: '',
         date: new Date().toISOString().slice(0, 10),
@@ -178,11 +181,14 @@ export default function QuotationsPage() {
       ]);
       fetchQuotations();
     } catch (err: any) {
-      showApiError(err, 'Failed to create quotation');
+      showApiError(err, editingQuotation ? 'Failed to update quotation' : 'Failed to create quotation');
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const openCreate = () => { setEditingQuotation(null); setForm({ customerId: '', date: new Date().toISOString().slice(0, 10), validUntil: '', currency: 'USD', notes: '', terms: '' }); setRows([{ productId: '', itemCode: '', description: '', quantity: 1, unitPrice: 0, discount: 0, taxRate: 0, total: 0 }]); setNewOpen(true); };
+  const openEdit = (quotation: Quotation) => { setEditingQuotation(quotation); setForm({ customerId: quotation.customerId || '', date: String(quotation.date).slice(0, 10), validUntil: quotation.validUntil ? String(quotation.validUntil).slice(0, 10) : '', currency: quotation.currency || 'USD', notes: quotation.notes || '', terms: quotation.terms || '' }); setRows((quotation.items || []).map((item: any) => ({ productId: item.productId || '', itemCode: item.itemCode || item.product?.sku || '', description: item.description || item.product?.name || '', quantity: Number(item.quantity), unitPrice: Number(item.unitPrice), discount: Number(item.discount || 0), taxRate: Number(item.taxRate || 0), total: Number(item.total || 0) }))); setNewOpen(true); };
 
   const columns = [
     {
@@ -207,6 +213,7 @@ export default function QuotationsPage() {
       key: 'actions',
       header: '',
       render: (q: Quotation) => <div className="flex flex-wrap justify-end gap-1">
+        {q.status === 'DRAFT' && !(q as any).submittedAt && <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); openEdit(q); }}><Pencil className="mr-1 h-3.5 w-3.5" />Edit</Button>}
         {q.status === 'DRAFT' && !(q as any).submittedAt && <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); quotationAction(q, 'submit'); }}>Submit</Button>}
         {q.status === 'DRAFT' && Boolean((q as any).submittedAt) && <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setActionValue((q.customer as any)?.email || ''); setActionDialog({ quotation: q, operation: 'send' }); }}>Email Rates</Button>}
         {q.status === 'SENT' && <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); quotationAction(q, 'accept'); }}>Accept</Button>}
@@ -222,14 +229,14 @@ export default function QuotationsPage() {
       <PageHeader
         title="Quotations"
         description="Create and manage customer quotations"
-        action={{ label: 'New Quotation', onClick: () => setNewOpen(true), icon: Plus }}
+        action={{ label: 'New Quotation', onClick: openCreate, icon: Plus }}
       />
       {quotations.length === 0 && !isLoading ? (
         <EmptyState
           icon={FileText}
           title="No quotations found"
           description="Create sales quotations with pricing, taxes, and terms to send to customers."
-          action={{ label: 'New Quotation', onClick: () => setNewOpen(true) }}
+          action={{ label: 'New Quotation', onClick: openCreate }}
         />
       ) : (
         <>
@@ -296,10 +303,10 @@ export default function QuotationsPage() {
       </Dialog>
 
       {/* New Quotation Dialog */}
-      <Dialog open={newOpen} onOpenChange={setNewOpen}>
+      <Dialog open={newOpen} onOpenChange={(open) => { setNewOpen(open); if (!open) setEditingQuotation(null); }}>
         <DialogContent className="max-w-5xl">
           <DialogHeader>
-            <DialogTitle>New Quotation</DialogTitle>
+            <DialogTitle>{editingQuotation ? 'Edit Quotation' : 'New Quotation'}</DialogTitle>
           </DialogHeader>
 
           {customers.length === 0 && (
@@ -385,7 +392,7 @@ export default function QuotationsPage() {
                 Cancel
               </Button>
               <Button onClick={createQuotation} disabled={isSubmitting || customers.length === 0}>
-                {isSubmitting ? 'Creating Quotation...' : 'Create Quotation'}
+                {isSubmitting ? 'Saving...' : editingQuotation ? 'Save Changes' : 'Create Quotation'}
               </Button>
             </div>
           </div>

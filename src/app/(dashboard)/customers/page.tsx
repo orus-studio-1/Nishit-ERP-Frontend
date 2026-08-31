@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Building2 } from 'lucide-react';
+import { Plus, Building2, Pencil } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
 import { Pagination } from '@/components/shared/Pagination';
@@ -26,6 +26,7 @@ export default function CustomersPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [editing, setEditing] = useState<Customer | null>(null);
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -78,14 +79,16 @@ export default function CustomersPage() {
 
     setIsSubmitting(true);
     try {
-      await api.post('/customers', {
+      const payload = {
         ...form,
         name: trimmedName,
         creditLimit: Number(form.creditLimit || 0),
         paymentTerms: Number(form.paymentTerms || 0),
-      });
-      showApiSuccess(`Customer "${trimmedName}" created successfully`);
+      };
+      if (editing) await api.put(`/customers/${editing.id}`, payload); else await api.post('/customers', payload);
+      showApiSuccess(`Customer "${trimmedName}" ${editing ? 'updated' : 'created'} successfully`);
       setShowModal(false);
+      setEditing(null);
       setForm({
         name: '',
         email: '',
@@ -101,11 +104,15 @@ export default function CustomersPage() {
       });
       fetchCustomers();
     } catch (err: any) {
-      showApiError(err, 'Failed to create customer');
+      showApiError(err, editing ? 'Failed to update customer' : 'Failed to create customer');
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const emptyForm = { name: '', email: '', phone: '', address: '', city: '', country: '', taxId: '', currency: 'INR', creditLimit: 0, paymentTerms: 30, notes: '' };
+  const openCreate = () => { setEditing(null); setForm(emptyForm); setShowModal(true); };
+  const openEdit = (customer: Customer) => { setEditing(customer); setForm({ name: customer.name || '', email: customer.email || '', phone: customer.phone || '', address: customer.address || '', city: customer.city || '', country: customer.country || '', taxId: customer.taxId || '', currency: customer.currency || 'INR', creditLimit: Number(customer.creditLimit || 0), paymentTerms: Number(customer.paymentTerms || 0), notes: customer.notes || '' }); setShowModal(true); };
 
   const columns = [
     { key: 'customerNo', header: 'ID' },
@@ -127,16 +134,7 @@ export default function CustomersPage() {
       key: 'actions',
       header: '',
       render: (c: Customer) => (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={(e) => {
-            e.stopPropagation();
-            router.push(`/customers/${c.id}`);
-          }}
-        >
-          View
-        </Button>
+        <div className="flex gap-1"><Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); openEdit(c); }}><Pencil className="mr-1 h-3.5 w-3.5" />Edit</Button><Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); router.push(`/customers/${c.id}`); }}>View</Button></div>
       ),
     },
   ];
@@ -146,7 +144,7 @@ export default function CustomersPage() {
       <PageHeader
         title="Customers"
         description="Manage your customer accounts"
-        action={{ label: 'New Customer', onClick: () => setShowModal(true), icon: Plus }}
+        action={{ label: 'New Customer', onClick: openCreate, icon: Plus }}
       />
 
       <div className="mb-4">
@@ -166,7 +164,7 @@ export default function CustomersPage() {
           icon={Building2}
           title="No customers yet"
           description="Add your first customer to get started"
-          action={{ label: 'Add Customer', onClick: () => setShowModal(true) }}
+          action={{ label: 'Add Customer', onClick: openCreate }}
         />
       ) : (
         <>
@@ -188,10 +186,10 @@ export default function CustomersPage() {
         </>
       )}
 
-      <Dialog open={showModal} onOpenChange={setShowModal}>
+      <Dialog open={showModal} onOpenChange={(open) => { setShowModal(open); if (!open) setEditing(null); }}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>New Customer</DialogTitle>
+            <DialogTitle>{editing ? 'Edit Customer' : 'New Customer'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleCreate} className="grid grid-cols-2 gap-4 mt-2">
             <div className="col-span-2 space-y-1.5">
@@ -282,7 +280,7 @@ export default function CustomersPage() {
                 Cancel
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Creating...' : 'Create Customer'}
+                {isSubmitting ? 'Saving...' : editing ? 'Save Changes' : 'Create Customer'}
               </Button>
             </div>
           </form>

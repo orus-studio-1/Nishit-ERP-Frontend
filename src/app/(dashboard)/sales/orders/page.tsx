@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Plus, ShoppingCart, AlertCircle, ArrowRight } from 'lucide-react';
+import { Plus, ShoppingCart, AlertCircle, ArrowRight, Pencil } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
 import { Pagination } from '@/components/shared/Pagination';
@@ -32,6 +32,7 @@ export default function SalesOrdersPage() {
   const [lineQuantities, setLineQuantities] = useState<Record<string, number>>({});
   const [trackingNo, setTrackingNo] = useState('');
   const [newOpen, setNewOpen] = useState(false);
+  const [editingOrder, setEditingOrder] = useState<SalesOrder | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCreatingInvoice, setIsCreatingInvoice] = useState(false);
   const [isCreatingDelivery, setIsCreatingDelivery] = useState(false);
@@ -156,7 +157,7 @@ export default function SalesOrdersPage() {
     }
   };
 
-  const createOrder = async () => {
+  const saveOrder = async () => {
     if (isSubmitting) return;
 
     if (!form.customerId) {
@@ -200,9 +201,11 @@ export default function SalesOrdersPage() {
 
     setIsSubmitting(true);
     try {
-      await api.post('/sales/orders', { ...form, items });
-      showApiSuccess('Sales order created successfully');
+      if (editingOrder) await api.put(`/sales/sales-orders/${editingOrder.id}`, { ...form, items });
+      else await api.post('/sales/orders', { ...form, items });
+      showApiSuccess(`Sales order ${editingOrder ? 'updated' : 'created'} successfully`);
       setNewOpen(false);
+      setEditingOrder(null);
       setForm({
         customerId: '',
         date: new Date().toISOString().slice(0, 10),
@@ -217,10 +220,33 @@ export default function SalesOrdersPage() {
       ]);
       fetchOrders();
     } catch (err: any) {
-      showApiError(err, 'Failed to create sales order');
+      showApiError(err, editingOrder ? 'Failed to update sales order' : 'Failed to create sales order');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const openCreate = () => {
+    setEditingOrder(null);
+    setForm({ customerId: '', date: new Date().toISOString().slice(0, 10), deliveryDate: '', currency: 'USD', notes: '', terms: '', supplyMode: 'MAKE_TO_STOCK' });
+    setRows([{ productId: '', itemCode: '', description: '', quantity: 1, unitPrice: 0, discount: 0, taxRate: 0, total: 0 }]);
+    setNewOpen(true);
+  };
+
+  const openEdit = (order: SalesOrder) => {
+    const source = order as any;
+    setEditingOrder(order);
+    setForm({
+      customerId: source.customerId || '',
+      date: String(source.date).slice(0, 10),
+      deliveryDate: source.deliveryDate ? String(source.deliveryDate).slice(0, 10) : '',
+      currency: source.currency || 'USD',
+      notes: source.notes || '',
+      terms: source.terms || '',
+      supplyMode: source.supplyMode || source.items?.[0]?.supplyMode || 'MAKE_TO_STOCK',
+    });
+    setRows((source.items || []).map((item: any) => ({ productId: item.productId || '', itemCode: item.itemCode || item.product?.sku || '', description: item.description || item.product?.name || '', quantity: Number(item.quantity), unitPrice: Number(item.unitPrice), discount: Number(item.discount || 0), taxTemplateId: item.taxTemplateId || '', taxRate: Number(item.taxRate || 0), total: Number(item.total || 0) })));
+    setNewOpen(true);
   };
 
   const columns = [
@@ -247,6 +273,11 @@ export default function SalesOrdersPage() {
       header: '',
       render: (o: SalesOrder) => (
         <div className="flex gap-1">
+          {o.status === 'DRAFT' && (
+            <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); openEdit(o); }}>
+              <Pencil className="mr-1 h-3.5 w-3.5" />Edit
+            </Button>
+          )}
           {o.status === 'DRAFT' && (
             <Button
               size="sm"
@@ -307,14 +338,14 @@ export default function SalesOrdersPage() {
       <PageHeader
         title="Sales Orders"
         description="Manage and track customer sales orders"
-        action={{ label: 'New Sales Order', onClick: () => setNewOpen(true), icon: Plus }}
+        action={{ label: 'New Sales Order', onClick: openCreate, icon: Plus }}
       />
       {orders.length === 0 && !isLoading ? (
         <EmptyState
           icon={ShoppingCart}
           title="No sales orders found"
           description="Sales orders will appear here when created directly or converted from accepted quotations."
-          action={{ label: 'New Sales Order', onClick: () => setNewOpen(true) }}
+          action={{ label: 'New Sales Order', onClick: openCreate }}
         />
       ) : (
         <>
@@ -386,10 +417,10 @@ export default function SalesOrdersPage() {
       </Dialog>
 
       {/* New Sales Order Dialog */}
-      <Dialog open={newOpen} onOpenChange={setNewOpen}>
+      <Dialog open={newOpen} onOpenChange={(open) => { setNewOpen(open); if (!open) setEditingOrder(null); }}>
         <DialogContent className="max-w-5xl">
           <DialogHeader>
-            <DialogTitle>New Sales Order</DialogTitle>
+            <DialogTitle>{editingOrder ? 'Edit Sales Order' : 'New Sales Order'}</DialogTitle>
           </DialogHeader>
 
           {customers.length === 0 && (
@@ -481,8 +512,8 @@ export default function SalesOrdersPage() {
               <Button variant="outline" onClick={() => setNewOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={createOrder} disabled={isSubmitting || customers.length === 0}>
-                {isSubmitting ? 'Creating Order...' : 'Create Sales Order'}
+              <Button onClick={saveOrder} disabled={isSubmitting || customers.length === 0}>
+                {isSubmitting ? 'Saving...' : editingOrder ? 'Save Changes' : 'Create Sales Order'}
               </Button>
             </div>
           </div>

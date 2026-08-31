@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { AlertCircle, ArrowUpRight, BriefcaseBusiness, Plus } from 'lucide-react';
+import { AlertCircle, ArrowUpRight, BriefcaseBusiness, Pencil, Plus } from 'lucide-react';
 import api from '@/lib/api';
 import { Department, Position } from '@/types';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -24,6 +24,7 @@ export default function PositionsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [editingPosition, setEditingPosition] = useState<Position | null>(null);
   const [form, setForm] = useState({ title: '', departmentId: '', description: '', minSalary: '', maxSalary: '' });
 
   const fetchAll = async () => {
@@ -59,22 +60,28 @@ export default function PositionsPage() {
 
     setIsSubmitting(true);
     try {
-      await api.post('/hr/positions', {
+      const payload = {
         ...form,
         title: trimmedTitle,
         minSalary: form.minSalary ? Number(form.minSalary) : undefined,
         maxSalary: form.maxSalary ? Number(form.maxSalary) : undefined,
-      });
-      showApiSuccess(`Position "${trimmedTitle}" created successfully`);
+      };
+      if (editingPosition) await api.put(`/hr/positions/${editingPosition.id}`, payload);
+      else await api.post('/hr/positions', payload);
+      showApiSuccess(`Position "${trimmedTitle}" ${editingPosition ? 'updated' : 'created'} successfully`);
       setShowModal(false);
+      setEditingPosition(null);
       setForm({ title: '', departmentId: '', description: '', minSalary: '', maxSalary: '' });
       fetchAll();
     } catch (err: any) {
-      showApiError(err, 'Failed to create position');
+      showApiError(err, editingPosition ? 'Failed to update position' : 'Failed to create position');
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const openCreate = () => { setEditingPosition(null); setForm({ title: '', departmentId: '', description: '', minSalary: '', maxSalary: '' }); setShowModal(true); };
+  const openEdit = (position: Position) => { const row = position as any; setEditingPosition(position); setForm({ title: row.title || '', departmentId: row.departmentId || row.department?.id || '', description: row.description || '', minSalary: row.minSalary == null ? '' : String(row.minSalary), maxSalary: row.maxSalary == null ? '' : String(row.maxSalary) }); setShowModal(true); };
 
   const columns = [
     { key: 'title', header: 'Position', render: (p: Position) => <span className="font-medium text-gray-900">{p.title}</span> },
@@ -82,6 +89,7 @@ export default function PositionsPage() {
     { key: 'minSalary', header: 'Min Salary', render: (p: Position) => p.minSalary ? `₹ ${Number(p.minSalary).toLocaleString('en-IN')}` : '-' },
     { key: 'maxSalary', header: 'Max Salary', render: (p: Position) => p.maxSalary ? `₹ ${Number(p.maxSalary).toLocaleString('en-IN')}` : '-' },
     { key: 'employees', header: 'Employees', render: (p: any) => p._count?.employees || 0 },
+    { key: 'actions', header: '', render: (p: Position) => <Button size="sm" variant="outline" onClick={() => openEdit(p)}><Pencil className="mr-1 h-3.5 w-3.5" />Edit</Button> },
   ];
 
   return (
@@ -89,23 +97,23 @@ export default function PositionsPage() {
       <PageHeader
         title="Positions"
         description="Define job titles under departments before assigning employees"
-        action={{ label: 'New Position', icon: Plus, onClick: () => setShowModal(true) }}
+        action={{ label: 'New Position', icon: Plus, onClick: openCreate }}
       />
       {positions.length === 0 && !isLoading ? (
         <EmptyState
           icon={BriefcaseBusiness}
           title="No positions yet"
           description="Create departments first, then define positions under them"
-          action={{ label: 'Create Position', onClick: () => setShowModal(true) }}
+          action={{ label: 'Create Position', onClick: openCreate }}
         />
       ) : (
         <DataTable columns={columns} data={positions as any[]} isLoading={isLoading} />
       )}
 
-      <Dialog open={showModal} onOpenChange={setShowModal}>
+      <Dialog open={showModal} onOpenChange={(open) => { setShowModal(open); if (!open) setEditingPosition(null); }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>New Position</DialogTitle>
+            <DialogTitle>{editingPosition ? 'Edit Position' : 'New Position'}</DialogTitle>
           </DialogHeader>
 
           {departments.length === 0 && !isLoading && (
@@ -193,7 +201,7 @@ export default function PositionsPage() {
                 Cancel
               </Button>
               <Button type="submit" disabled={isSubmitting || departments.length === 0}>
-                {isSubmitting ? 'Creating...' : 'Create Position'}
+                {isSubmitting ? 'Saving...' : editingPosition ? 'Save Changes' : 'Create Position'}
               </Button>
             </div>
           </form>

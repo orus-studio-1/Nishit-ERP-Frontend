@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Plus, Building2 } from 'lucide-react';
+import { Plus, Building2, Pencil } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,7 @@ export default function WarehousesPage() {
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ name: '', code: '', address: '', city: '', country: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editing, setEditing] = useState<Warehouse | null>(null);
 
   const fetchWarehouses = async () => {
     setIsLoading(true);
@@ -55,21 +56,25 @@ export default function WarehousesPage() {
 
     setIsSubmitting(true);
     try {
-      await api.post('/inventory/warehouses', {
+      const payload = {
         ...form,
         name: trimmedName,
         code: trimmedCode,
-      });
-      showApiSuccess(`Warehouse "${trimmedName}" created successfully`);
+      };
+      if (editing) await api.put(`/inventory/warehouses/${editing.id}`, payload); else await api.post('/inventory/warehouses', payload);
+      showApiSuccess(`Warehouse "${trimmedName}" ${editing ? 'updated' : 'created'} successfully`);
       setShowModal(false);
+      setEditing(null);
       setForm({ name: '', code: '', address: '', city: '', country: '' });
       fetchWarehouses();
     } catch (err: any) {
-      showApiError(err, 'Failed to create warehouse');
+      showApiError(err, editing ? 'Failed to update warehouse' : 'Failed to create warehouse');
     } finally {
       setIsSubmitting(false);
     }
   };
+  const openCreate = () => { setEditing(null); setForm({ name: '', code: '', address: '', city: '', country: '' }); setShowModal(true); };
+  const openEdit = (warehouse: Warehouse) => { setEditing(warehouse); setForm({ name: warehouse.name || '', code: warehouse.code || '', address: warehouse.address || '', city: warehouse.city || '', country: warehouse.country || '' }); setShowModal(true); };
 
   const columns = [
     {
@@ -101,6 +106,7 @@ export default function WarehousesPage() {
         </span>
       ),
     },
+    { key: 'actions', header: '', render: (w: Warehouse) => <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); openEdit(w); }}><Pencil className="mr-1 h-3.5 w-3.5" />Edit</Button> },
   ];
 
   return (
@@ -108,22 +114,22 @@ export default function WarehousesPage() {
       <PageHeader
         title="Warehouses"
         description="Manage storage locations"
-        action={{ label: 'New Warehouse', onClick: () => setShowModal(true), icon: Plus }}
+        action={{ label: 'New Warehouse', onClick: openCreate, icon: Plus }}
       />
       {warehouses.length === 0 && !isLoading ? (
         <EmptyState
           icon={Building2}
           title="No warehouses"
           description="Add your first warehouse location"
-          action={{ label: 'Add Warehouse', onClick: () => setShowModal(true) }}
+          action={{ label: 'Add Warehouse', onClick: openCreate }}
         />
       ) : (
         <DataTable columns={columns} data={warehouses} isLoading={isLoading} />
       )}
-      <Dialog open={showModal} onOpenChange={setShowModal}>
+      <Dialog open={showModal} onOpenChange={(open) => { setShowModal(open); if (!open) setEditing(null); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>New Warehouse</DialogTitle>
+            <DialogTitle>{editing ? 'Edit Warehouse' : 'New Warehouse'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleCreate} className="space-y-4 mt-2">
             <div className="space-y-1.5">
@@ -175,7 +181,7 @@ export default function WarehousesPage() {
                 Cancel
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Creating...' : 'Create Warehouse'}
+                {isSubmitting ? 'Saving...' : editing ? 'Save Changes' : 'Create Warehouse'}
               </Button>
             </div>
           </form>

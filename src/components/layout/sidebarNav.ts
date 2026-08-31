@@ -8,7 +8,7 @@ import {
   ChartColumnIncreasing, ArchiveX, UserRound, Building, Target, Activity,
   Route, Upload, FileCheck2, ClipboardSignature, CalendarCheck, CalendarCog, CalendarX,
   ListChecks, HandCoins, BadgeDollarSign, Wallet, UserCog, SlidersHorizontal, KeyRound,
-  Handshake, Scale, PackageCheck
+  Handshake, Scale, PackageCheck, History
 } from 'lucide-react';
 
 export interface NavItem {
@@ -56,6 +56,7 @@ export const navItems: NavItem[] = [
 	      { label: 'Item-wise Sales', href: '/inventory/reports/item-wise-sales', icon: ChartColumnIncreasing, permission: 'inventory:stock-balance:read' },
 	      { label: 'Gross Profit', href: '/inventory/reports/gross-profit', icon: CircleDollarSign, permission: 'inventory:stock-balance:read' },
 	      { label: 'Slow Moving Stock', href: '/inventory/reports/slow-moving-stock', icon: ArchiveX, permission: 'inventory:stock-balance:read' },
+	      { label: 'Inventory Audit Trail', href: '/audit-trail?module=inventory', icon: History, permission: 'access:audit:read' },
     ],
   },
   {
@@ -91,6 +92,7 @@ export const navItems: NavItem[] = [
       { label: 'Assignment Rules', href: '/crm/assignment-rules', icon: Route, permission: 'crm:assignment-rules:read' },
       { label: 'CRM Reports', href: '/crm/reports', icon: BarChart3, permission: 'crm:reports:read' },
       { label: 'CRM Configuration', href: '/crm/settings', icon: Settings },
+      { label: 'CRM Audit Trail', href: '/audit-trail?module=crm', icon: History, permission: 'access:audit:read' },
     ],
   },
   {
@@ -102,6 +104,7 @@ export const navItems: NavItem[] = [
       { label: 'Fulfilment', href: '/sales/fulfilment', icon: PackageCheck },
       { label: 'Sales Reports', href: '/sales/reports', icon: BarChart3 },
       { label: 'Sales Configuration', href: '/sales/settings', icon: Settings },
+      { label: 'Sales Audit Trail', href: '/audit-trail?module=sales', icon: History, permission: 'access:audit:read' },
     ],
   },
   {
@@ -143,6 +146,7 @@ export const navItems: NavItem[] = [
       { label: 'Communications', href: '/procurement/communications', icon: Activity, permission: 'procurement:communications:read' },
       { label: 'Procurement Tracker', href: '/procurement/tracker', icon: BarChart3, permission: 'procurement:tracker:read' },
       { label: 'Procurement Reports', href: '/procurement/reports', icon: ChartColumnIncreasing, permission: 'procurement:reports:read' },
+      { label: 'Procurement Audit Trail', href: '/procurement/audit-trail', icon: History, permission: 'access:audit:read' },
       { label: 'Buying Settings', href: '/procurement/settings', icon: Settings, permission: 'procurement:settings:read' },
     ],
   },
@@ -154,6 +158,7 @@ export const navItems: NavItem[] = [
       { label: 'General Settings', href: '/settings', icon: SlidersHorizontal },
       { label: 'Organization Setup', href: '/settings/organization', icon: Building2, permission: 'company:company:read' },
       { label: 'Access Control', href: '/settings/access', icon: KeyRound, permission: 'access:users:read' },
+      { label: 'Organization Audit Trail', href: '/audit-trail', icon: History, permission: 'access:audit:read' },
     ],
   },
 ];
@@ -163,6 +168,7 @@ export function inferredPermission(href?: string) {
     const parts = href.split('/').filter(Boolean);
     if (href === '/dashboard') return 'dashboard:dashboard:read';
     if (parts[0] === 'settings') return parts[1] === 'access' ? 'access:users:read' : 'company:company:read';
+    if (parts[0] === 'audit-trail') return 'access:audit:read';
     if (parts[0] === 'customers') return 'customers:customers:read';
     if (parts[0] === 'suppliers') return 'suppliers:suppliers:read';
     if (parts[0] === 'projects') return 'projects:projects:read';

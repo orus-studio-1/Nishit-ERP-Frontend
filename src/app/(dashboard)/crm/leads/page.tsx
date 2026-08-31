@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Plus, TrendingUp, Upload } from 'lucide-react';
+import { Pencil, Plus, TrendingUp, Upload } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
@@ -31,6 +31,7 @@ export default function LeadsPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [showImport, setShowImport] = useState(false);
   const [openingContactId, setOpeningContactId] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -99,22 +100,24 @@ export default function LeadsPage() {
 
     setIsSubmitting(true);
     try {
-      const duplicateCheck = await api.post('/crm/leads/check-duplicate', { email: form.email, phone: form.phone, country: form.country });
-      const suggestions = duplicateCheck.data?.data?.suggestions || [];
+      const duplicateCheck = editingLead ? null : await api.post('/crm/leads/check-duplicate', { email: form.email, phone: form.phone, country: form.country });
+      const suggestions = duplicateCheck?.data?.data?.suggestions || [];
       const allowDuplicate = suggestions.length > 0
         ? window.confirm(`Possible duplicate found: ${suggestions.map((item: any) => item.title).join(', ')}. Create this lead anyway?`)
         : false;
       if (suggestions.length > 0 && !allowDuplicate) return;
-      await api.post('/crm/leads', {
+      const payload = {
         ...form,
         title: trimmedTitle,
         firstName: trimmedFirst,
         lastName: trimmedLast,
         value: numValue,
         allowDuplicate,
-      });
-      showApiSuccess('Lead created successfully');
+      };
+      if (editingLead) await api.put(`/crm/leads/${editingLead.id}`, payload); else await api.post('/crm/leads', payload);
+      showApiSuccess(`Lead ${editingLead ? 'updated' : 'created'} successfully`);
       setShowModal(false);
+      setEditingLead(null);
       setForm({
         title: '',
         firstName: '',
@@ -132,11 +135,15 @@ export default function LeadsPage() {
       });
       fetchLeads();
     } catch (err: any) {
-      showApiError(err, 'Failed to create lead');
+      showApiError(err, editingLead ? 'Failed to update lead' : 'Failed to create lead');
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const emptyForm = { title: '', firstName: '', lastName: '', email: '', phone: '', company: '', city: '', country: '', source: 'WEBSITE', status: 'NEW', priority: 'MEDIUM', value: '', notes: '' };
+  const openCreate = () => { setEditingLead(null); setForm(emptyForm); setShowModal(true); };
+  const openEdit = (lead: Lead) => { const row = lead as any; setEditingLead(lead); setForm({ title: row.title || '', firstName: row.firstName || '', lastName: row.lastName || '', email: row.email || '', phone: row.phone || '', company: row.company || '', city: row.city || '', country: row.country || '', source: row.source || 'WEBSITE', status: row.status || 'NEW', priority: row.priority || 'MEDIUM', value: row.value == null ? '' : String(row.value), notes: row.notes || '' }); setShowModal(true); };
 
   const handleConvert = async (id: string) => {
     if (convertingId) return;
@@ -193,6 +200,7 @@ export default function LeadsPage() {
       header: '',
       render: (l: Lead) => (
         <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); openEdit(l); }}><Pencil className="mr-1 h-3.5 w-3.5" />Edit</Button>
           <Button
             size="sm"
             variant="outline"
@@ -229,7 +237,7 @@ export default function LeadsPage() {
       <PageHeader
         title="Leads"
         description="Capture, import, qualify, and convert sales leads"
-        action={{ label: 'New Lead', onClick: () => setShowModal(true), icon: Plus }}
+        action={{ label: 'New Lead', onClick: openCreate, icon: Plus }}
       >
         <Button variant="outline" onClick={() => setShowImport(true)}>
           <Upload className="mr-2 h-4 w-4" />
@@ -273,7 +281,7 @@ export default function LeadsPage() {
           icon={TrendingUp}
           title="No leads yet"
           description="Start capturing leads to grow your business"
-          action={{ label: 'Add Lead', onClick: () => setShowModal(true) }}
+          action={{ label: 'Add Lead', onClick: openCreate }}
         />
       ) : (
         <>
@@ -295,10 +303,10 @@ export default function LeadsPage() {
         </>
       )}
 
-      <Dialog open={showModal} onOpenChange={setShowModal}>
+      <Dialog open={showModal} onOpenChange={(open) => { setShowModal(open); if (!open) setEditingLead(null); }}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>New Lead</DialogTitle>
+            <DialogTitle>{editingLead ? 'Edit Lead' : 'New Lead'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleCreate} className="grid grid-cols-2 gap-4 mt-2">
             <div className="col-span-2 space-y-1.5">
@@ -415,7 +423,7 @@ export default function LeadsPage() {
                 Cancel
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Creating...' : 'Create Lead'}
+                {isSubmitting ? 'Saving...' : editingLead ? 'Save Changes' : 'Create Lead'}
               </Button>
             </div>
           </form>

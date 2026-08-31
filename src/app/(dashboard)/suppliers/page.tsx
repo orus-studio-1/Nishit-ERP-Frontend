@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Plus, Truck } from 'lucide-react';
+import { Plus, Truck, Pencil } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
 import { Pagination } from '@/components/shared/Pagination';
@@ -24,6 +24,7 @@ export default function SuppliersPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [editing, setEditing] = useState<Supplier | null>(null);
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -69,13 +70,15 @@ export default function SuppliersPage() {
 
     setIsSubmitting(true);
     try {
-      await api.post('/suppliers', {
+      const payload = {
         ...form,
         name: trimmedName,
         paymentTerms: Number(form.paymentTerms || 0),
-      });
-      showApiSuccess(`Supplier "${trimmedName}" created successfully`);
+      };
+      if (editing) await api.put(`/suppliers/${editing.id}`, payload); else await api.post('/suppliers', payload);
+      showApiSuccess(`Supplier "${trimmedName}" ${editing ? 'updated' : 'created'} successfully`);
       setShowModal(false);
+      setEditing(null);
       setForm({
         name: '',
         email: '',
@@ -92,11 +95,15 @@ export default function SuppliersPage() {
       });
       fetchSuppliers();
     } catch (err: any) {
-      showApiError(err, 'Failed to create supplier');
+      showApiError(err, editing ? 'Failed to update supplier' : 'Failed to create supplier');
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const emptyForm = { name: '', email: '', phone: '', address: '', city: '', country: '', taxId: '', currency: 'INR', paymentTerms: 30, bankAccount: '', bankName: '', notes: '' };
+  const openCreate = () => { setEditing(null); setForm(emptyForm); setShowModal(true); };
+  const openEdit = (supplier: Supplier) => { setEditing(supplier); setForm({ name: supplier.name || '', email: supplier.email || '', phone: supplier.phone || '', address: supplier.address || '', city: supplier.city || '', country: supplier.country || '', taxId: supplier.taxId || '', currency: supplier.currency || 'INR', paymentTerms: Number(supplier.paymentTerms || 0), bankAccount: supplier.bankAccount || '', bankName: supplier.bankName || '', notes: supplier.notes || '' }); setShowModal(true); };
 
   const columns = [
     { key: 'supplierNo', header: 'ID' },
@@ -114,6 +121,7 @@ export default function SuppliersPage() {
       header: 'Payment Terms',
       render: (s: Supplier) => `${s.paymentTerms} days`,
     },
+    { key: 'actions', header: '', render: (s: Supplier) => <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); openEdit(s); }}><Pencil className="mr-1 h-3.5 w-3.5" />Edit</Button> },
   ];
 
   return (
@@ -121,7 +129,7 @@ export default function SuppliersPage() {
       <PageHeader
         title="Suppliers"
         description="Manage your supplier accounts"
-        action={{ label: 'New Supplier', onClick: () => setShowModal(true), icon: Plus }}
+        action={{ label: 'New Supplier', onClick: openCreate, icon: Plus }}
       />
       <div className="mb-4">
         <Input
@@ -139,7 +147,7 @@ export default function SuppliersPage() {
           icon={Truck}
           title="No suppliers yet"
           description="Add your first supplier"
-          action={{ label: 'Add Supplier', onClick: () => setShowModal(true) }}
+          action={{ label: 'Add Supplier', onClick: openCreate }}
         />
       ) : (
         <>
@@ -156,10 +164,10 @@ export default function SuppliersPage() {
         </>
       )}
 
-      <Dialog open={showModal} onOpenChange={setShowModal}>
+      <Dialog open={showModal} onOpenChange={(open) => { setShowModal(open); if (!open) setEditing(null); }}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>New Supplier</DialogTitle>
+            <DialogTitle>{editing ? 'Edit Supplier' : 'New Supplier'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleCreate} className="grid grid-cols-2 gap-4 mt-2">
             <div className="col-span-2 space-y-1.5">
@@ -249,7 +257,7 @@ export default function SuppliersPage() {
                 Cancel
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Creating...' : 'Create Supplier'}
+                {isSubmitting ? 'Saving...' : editing ? 'Save Changes' : 'Create Supplier'}
               </Button>
             </div>
           </form>

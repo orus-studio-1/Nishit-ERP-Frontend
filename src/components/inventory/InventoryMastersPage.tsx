@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Pencil, Plus, Trash2, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '@/lib/api';
 import { showApiError, showApiSuccess } from '@/lib/apiError';
@@ -32,6 +32,7 @@ export function InventoryMastersPage() {
   const [warehouses, setWarehouses] = useState<Row[]>([]);
   const [busy, setBusy] = useState('');
   const [unit, setUnit] = useState({ name: '', symbol: '' });
+  const [editingUnitId, setEditingUnitId] = useState('');
   const [attribute, setAttribute] = useState({ name: '', values: '' });
   const [conversion, setConversion] = useState({ productId: '', fromUnitId: '', toUnitId: '', factor: '' });
   const [batch, setBatch] = useState({ batchNo: '', productId: '', warehouseId: '', quantity: '0', manufacturingDate: '', expiryDate: '', supplierBatchNo: '' });
@@ -61,6 +62,18 @@ export function InventoryMastersPage() {
     if (!window.confirm(`Delete ${label}? This is allowed only when it is not used by another record.`)) return;
     try { await api.delete(path); showApiSuccess(`${label} deleted`); await load(); } catch (error) { showApiError(error, `Could not delete ${label}`); }
   };
+  const saveUnit = async () => {
+    if (busy || !unit.name.trim() || !unit.symbol.trim()) return;
+    setBusy('unit');
+    try {
+      const payload = { name: unit.name.trim(), symbol: unit.symbol.trim() };
+      if (editingUnitId) await api.put(`/inventory/units/${editingUnitId}`, payload);
+      else await api.post('/inventory/units', payload);
+      showApiSuccess(`Unit ${editingUnitId ? 'updated' : 'created'}`);
+      setUnit({ name: '', symbol: '' }); setEditingUnitId(''); await load();
+    } catch (error) { showApiError(error, `Could not ${editingUnitId ? 'update' : 'create'} unit`); }
+    finally { setBusy(''); }
+  };
 
   const productOptions = products.map(item => ({ id: item.id, label: `${item.sku} · ${item.name}` }));
   const warehouseOptions = warehouses.map(item => ({ id: item.id, label: item.name }));
@@ -70,8 +83,8 @@ export function InventoryMastersPage() {
     <PageHeader title="Inventory Configuration" description="Create every master record required by products, stock entries, transfers, pricing and traceability" />
     <div className="grid gap-4 xl:grid-cols-2">
       <Card><CardHeader><CardTitle>Units of Measure</CardTitle><CardDescription>Units shown in the Product form. Standard units are created automatically.</CardDescription></CardHeader><CardContent>
-        <div className="grid grid-cols-[1fr_1fr_auto] gap-2"><Input placeholder="Unit name" value={unit.name} onChange={e => setUnit({ ...unit, name: e.target.value })} /><Input placeholder="Symbol" value={unit.symbol} onChange={e => setUnit({ ...unit, symbol: e.target.value })} /><Button disabled={!unit.name.trim() || !unit.symbol.trim() || !!busy} onClick={() => submit('unit', '/inventory/units', unit, () => setUnit({ name: '', symbol: '' }), 'Unit created')}><Plus className="h-4 w-4" /></Button></div>
-        <Records empty={!units.length}>{units.map(row => <div key={row.id} className="flex items-center justify-between rounded border p-2 text-sm"><span>{row.name} <span className="text-muted-foreground">({row.symbol})</span></span><Button size="sm" variant="ghost" onClick={() => remove(`/inventory/units/${row.id}`, row.name)}><Trash2 className="h-4 w-4" /></Button></div>)}</Records>
+        <div className="grid grid-cols-[1fr_1fr_auto_auto] gap-2"><Input placeholder="Unit name" value={unit.name} onChange={e => setUnit({ ...unit, name: e.target.value })} /><Input placeholder="Symbol" value={unit.symbol} onChange={e => setUnit({ ...unit, symbol: e.target.value })} /><Button disabled={!unit.name.trim() || !unit.symbol.trim() || !!busy} onClick={saveUnit}>{editingUnitId ? <Pencil className="h-4 w-4" /> : <Plus className="h-4 w-4" />}</Button>{editingUnitId && <Button variant="outline" onClick={() => { setEditingUnitId(''); setUnit({ name: '', symbol: '' }); }}><X className="h-4 w-4" /></Button>}</div>
+        <Records empty={!units.length}>{units.map(row => <div key={row.id} className="flex items-center justify-between rounded border p-2 text-sm"><span>{row.name} <span className="text-muted-foreground">({row.symbol})</span></span><span className="flex gap-1"><Button size="sm" variant="ghost" aria-label={`Edit ${row.name}`} onClick={() => { setEditingUnitId(row.id); setUnit({ name: row.name || '', symbol: row.symbol || '' }); }}><Pencil className="h-4 w-4" /></Button><Button size="sm" variant="ghost" aria-label={`Delete ${row.name}`} onClick={() => remove(`/inventory/units/${row.id}`, row.name)}><Trash2 className="h-4 w-4" /></Button></span></div>)}</Records>
       </CardContent></Card>
 
       <Card><CardHeader><CardTitle>Product Attributes</CardTitle><CardDescription>Create variant dimensions such as size, colour, grade or material.</CardDescription></CardHeader><CardContent className="space-y-2">

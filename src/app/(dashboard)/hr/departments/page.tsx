@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Plus, Building2 } from 'lucide-react';
+import { Plus, Building2, Pencil } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,7 @@ export default function DepartmentsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
   const [form, setForm] = useState({ name: '', code: '', description: '' });
 
   const fetchDepts = async () => {
@@ -56,21 +57,27 @@ export default function DepartmentsPage() {
 
     setIsSubmitting(true);
     try {
-      await api.post('/hr/departments', {
+      const payload = {
         ...form,
         name: trimmedName,
         code: trimmedCode,
-      });
-      showApiSuccess(`Department "${trimmedName}" created successfully`);
+      };
+      if (editingDepartment) await api.put(`/hr/departments/${editingDepartment.id}`, payload);
+      else await api.post('/hr/departments', payload);
+      showApiSuccess(`Department "${trimmedName}" ${editingDepartment ? 'updated' : 'created'} successfully`);
       setShowModal(false);
+      setEditingDepartment(null);
       setForm({ name: '', code: '', description: '' });
       fetchDepts();
     } catch (err: any) {
-      showApiError(err, 'Failed to create department');
+      showApiError(err, editingDepartment ? 'Failed to update department' : 'Failed to create department');
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const openCreate = () => { setEditingDepartment(null); setForm({ name: '', code: '', description: '' }); setShowModal(true); };
+  const openEdit = (department: Department) => { setEditingDepartment(department); setForm({ name: department.name || '', code: department.code || '', description: department.description || '' }); setShowModal(true); };
 
   const columns = [
     {
@@ -90,6 +97,7 @@ export default function DepartmentsPage() {
     { key: 'description', header: 'Description', render: (d: Department) => d.description || '—' },
     { key: 'employees', header: 'Employees', render: (d: Department) => d._count?.employees || 0 },
     { key: 'positions', header: 'Positions', render: (d: Department) => d.positions?.length || 0 },
+    { key: 'actions', header: '', render: (d: Department) => <Button size="sm" variant="outline" onClick={() => openEdit(d)}><Pencil className="mr-1 h-3.5 w-3.5" />Edit</Button> },
   ];
 
   return (
@@ -97,22 +105,22 @@ export default function DepartmentsPage() {
       <PageHeader
         title="Departments"
         description="Manage company departments"
-        action={{ label: 'New Department', onClick: () => setShowModal(true), icon: Plus }}
+        action={{ label: 'New Department', onClick: openCreate, icon: Plus }}
       />
       {departments.length === 0 && !isLoading ? (
         <EmptyState
           icon={Building2}
           title="No departments"
           description="Create your first department to organize employees and positions"
-          action={{ label: 'Add Department', onClick: () => setShowModal(true) }}
+          action={{ label: 'Add Department', onClick: openCreate }}
         />
       ) : (
         <DataTable columns={columns} data={departments} isLoading={isLoading} />
       )}
-      <Dialog open={showModal} onOpenChange={setShowModal}>
+      <Dialog open={showModal} onOpenChange={(open) => { setShowModal(open); if (!open) setEditingDepartment(null); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>New Department</DialogTitle>
+            <DialogTitle>{editingDepartment ? 'Edit Department' : 'New Department'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleCreate} className="space-y-4 mt-2">
             <div className="space-y-1.5">
@@ -147,7 +155,7 @@ export default function DepartmentsPage() {
                 Cancel
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Creating...' : 'Create Department'}
+                {isSubmitting ? 'Saving...' : editingDepartment ? 'Save Changes' : 'Create Department'}
               </Button>
             </div>
           </form>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Plus, BookOpen } from 'lucide-react';
+import { Plus, BookOpen, Pencil } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
 import { Button } from '@/components/ui/button';
@@ -52,6 +52,7 @@ export default function AccountsPage() {
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(initialAccountForm);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editing, setEditing] = useState<Account | null>(null);
 
   const fetchAccounts = async () => {
     setIsLoading(true);
@@ -91,25 +92,29 @@ export default function AccountsPage() {
 
     setIsSubmitting(true);
     try {
-      await api.post('/accounting/accounts', {
+      const payload = {
         ...form,
         code: trimmedCode,
         name: trimmedName,
         parentId: form.parentId || null,
         frozenTillDate: form.freezeAccount && form.frozenTillDate ? form.frozenTillDate : null,
-      });
-      showApiSuccess(`Account "${trimmedCode} - ${trimmedName}" created successfully`);
+      };
+      if (editing) await api.put(`/accounting/accounts/${editing.id}`, payload); else await api.post('/accounting/accounts', payload);
+      showApiSuccess(`Account "${trimmedCode} - ${trimmedName}" ${editing ? 'updated' : 'created'} successfully`);
       setShowModal(false);
+      setEditing(null);
       setForm(initialAccountForm);
       fetchAccounts();
     } catch (err: any) {
-      showApiError(err, 'Failed to create account');
+      showApiError(err, editing ? 'Failed to update account' : 'Failed to create account');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const groupAccounts = accounts.filter((a) => a.isGroup);
+  const groupAccounts = accounts.filter((a) => a.isGroup && a.id !== editing?.id);
+  const openCreate = () => { setEditing(null); setForm(initialAccountForm); setShowModal(true); };
+  const openEdit = (account: Account) => { const source = account as any; setEditing(account); setForm({ code: account.code || '', name: account.name || '', type: account.type || 'ASSET', subType: account.subType || '', parentId: account.parentId || '', description: account.description || '', currency: account.currency || 'USD', isGroup: !!account.isGroup, freezeAccount: !!source.freezeAccount, frozenTillDate: source.frozenTillDate ? String(source.frozenTillDate).slice(0, 10) : '', isDefaultCash: !!source.isDefaultCash, isDefaultBank: !!source.isDefaultBank, isDefaultReceivable: !!source.isDefaultReceivable, isDefaultPayable: !!source.isDefaultPayable, isDefaultTax: !!source.isDefaultTax, isDefaultRetainedEarnings: !!source.isDefaultRetainedEarnings }); setShowModal(true); };
 
   const columns = [
     { key: 'code', header: 'Code', render: (a: Account) => <span className="font-mono text-sm font-semibold">{a.code}</span> },
@@ -144,6 +149,7 @@ export default function AccountsPage() {
         </span>
       ),
     },
+    { key: 'actions', header: '', render: (a: Account) => <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); openEdit(a); }}><Pencil className="mr-1 h-3.5 w-3.5" />Edit</Button> },
   ];
 
   return (
@@ -151,7 +157,7 @@ export default function AccountsPage() {
       <PageHeader
         title="Chart of Accounts"
         description="Manage your accounting chart of accounts"
-        action={{ label: 'New Account', onClick: () => setShowModal(true), icon: Plus }}
+        action={{ label: 'New Account', onClick: openCreate, icon: Plus }}
       />
 
       <div className="flex gap-2 mb-4 flex-wrap">
@@ -170,16 +176,16 @@ export default function AccountsPage() {
           icon={BookOpen}
           title="No accounts found"
           description="Set up your chart of accounts to start tracking ledgers, journal entries, and finances."
-          action={{ label: 'Add Account', onClick: () => setShowModal(true) }}
+          action={{ label: 'Add Account', onClick: openCreate }}
         />
       ) : (
         <DataTable columns={columns} data={accounts} isLoading={isLoading} />
       )}
 
-      <Dialog open={showModal} onOpenChange={setShowModal}>
+      <Dialog open={showModal} onOpenChange={(open) => { setShowModal(open); if (!open) setEditing(null); }}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
-            <DialogTitle>New Account</DialogTitle>
+            <DialogTitle>{editing ? 'Edit Account' : 'New Account'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleCreate} className="grid grid-cols-2 gap-4 mt-2">
             <div className="space-y-1.5">
@@ -310,7 +316,7 @@ export default function AccountsPage() {
                 Cancel
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Creating...' : 'Create Account'}
+                {isSubmitting ? 'Saving...' : editing ? 'Save Changes' : 'Create Account'}
               </Button>
             </div>
           </form>

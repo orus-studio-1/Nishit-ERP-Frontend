@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Plus, Package } from 'lucide-react';
+import { Plus, Package, Pencil } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
 import { Pagination } from '@/components/shared/Pagination';
@@ -29,6 +29,7 @@ export default function ProductsPage() {
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [form, setForm] = useState({
     sku: '',
     name: '',
@@ -101,7 +102,7 @@ export default function ProductsPage() {
 
     setIsSubmitting(true);
     try {
-      await api.post('/inventory/products', {
+      const payload = {
         ...form,
         sku: trimmedSku,
         name: trimmedName,
@@ -113,9 +114,12 @@ export default function ProductsPage() {
         minStockLevel: Number(form.minStockLevel || 0),
         reorderLevel: Number(form.reorderLevel || 0),
         reorderQty: Number(form.reorderQty || 0),
-      });
-      showApiSuccess(`Product "${trimmedName}" created successfully`);
+      };
+      if (editingProduct) await api.put(`/inventory/products/${editingProduct.id}`, payload);
+      else await api.post('/inventory/products', payload);
+      showApiSuccess(`Product "${trimmedName}" ${editingProduct ? 'updated' : 'created'} successfully`);
       setShowModal(false);
+      setEditingProduct(null);
       setForm({
         sku: '',
         name: '',
@@ -139,7 +143,7 @@ export default function ProductsPage() {
       });
       fetchAll();
     } catch (err: any) {
-      showApiError(err, 'Failed to create product');
+      showApiError(err, editingProduct ? 'Failed to update product' : 'Failed to create product');
     } finally {
       setIsSubmitting(false);
     }
@@ -147,6 +151,22 @@ export default function ProductsPage() {
 
   const getTotalStock = (product: Product) =>
     product.stockLevels?.reduce((sum, sl) => sum + sl.quantity, 0) || 0;
+
+  const openCreate = () => { setEditingProduct(null); setForm({ sku: '', name: '', description: '', categoryId: '', unitId: '', type: 'PRODUCT', costPrice: 0, salePrice: 0, taxRate: 0, minStockLevel: 0, valuationMethod: 'MOVING_AVERAGE', maintainStock: true, allowNegativeStock: false, hasBatchNo: false, hasSerialNo: false, reorderLevel: 0, reorderQty: 0, brand: '', manufacturer: '' }); setShowModal(true); };
+  const openEdit = (product: Product) => {
+    setEditingProduct(product);
+    setForm({
+      sku: product.sku || '', name: product.name || '', description: product.description || '',
+      categoryId: product.categoryId || '', unitId: product.unitId || '', type: product.type || 'PRODUCT',
+      costPrice: Number(product.costPrice || 0), salePrice: Number(product.salePrice || 0), taxRate: Number(product.taxRate || 0),
+      minStockLevel: Number(product.minStockLevel || 0), valuationMethod: product.valuationMethod || 'MOVING_AVERAGE',
+      maintainStock: product.maintainStock !== false, allowNegativeStock: !!product.allowNegativeStock,
+      hasBatchNo: !!product.hasBatchNo, hasSerialNo: !!product.hasSerialNo,
+      reorderLevel: Number(product.reorderLevel || 0), reorderQty: Number(product.reorderQty || 0),
+      brand: product.brand || '', manufacturer: product.manufacturer || '',
+    });
+    setShowModal(true);
+  };
 
   const columns = [
     {
@@ -200,6 +220,7 @@ export default function ProductsPage() {
         </span>
       ),
     },
+    { key: 'actions', header: '', render: (p: Product) => <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); openEdit(p); }}><Pencil className="mr-1 h-3.5 w-3.5" />Edit</Button> },
   ];
 
   return (
@@ -207,7 +228,7 @@ export default function ProductsPage() {
       <PageHeader
         title="Products"
         description="Manage your products and services"
-        action={{ label: 'New Product', onClick: () => setShowModal(true), icon: Plus }}
+        action={{ label: 'New Product', onClick: openCreate, icon: Plus }}
       />
       <div className="mb-4">
         <Input
@@ -225,7 +246,7 @@ export default function ProductsPage() {
           icon={Package}
           title="No products yet"
           description="Add your first product or service"
-          action={{ label: 'Add Product', onClick: () => setShowModal(true) }}
+          action={{ label: 'Add Product', onClick: openCreate }}
         />
       ) : (
         <>
@@ -242,10 +263,10 @@ export default function ProductsPage() {
         </>
       )}
 
-      <Dialog open={showModal} onOpenChange={setShowModal}>
+      <Dialog open={showModal} onOpenChange={(open) => { setShowModal(open); if (!open) setEditingProduct(null); }}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>New Product</DialogTitle>
+            <DialogTitle>{editingProduct ? 'Edit Product' : 'New Product'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleCreate} className="grid grid-cols-2 gap-4 mt-2">
             <div className="space-y-1.5">
@@ -465,7 +486,7 @@ export default function ProductsPage() {
                 Cancel
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Creating...' : 'Create Product'}
+                {isSubmitting ? 'Saving...' : editingProduct ? 'Save Changes' : 'Create Product'}
               </Button>
             </div>
           </form>
