@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ClipboardList, FileClock, PackageCheck, Play, Plus, Trash2, Truck } from 'lucide-react';
 import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -300,6 +301,8 @@ export function PaymentEntriesPage() {
 }
 
 export function DeliveryNotesPage() {
+  const [requestedOrderId] = useState(() => typeof window === 'undefined' ? '' : new URLSearchParams(window.location.search).get('salesOrderId') || '');
+  const requestedOrderApplied = useRef(false);
   const [notes, setNotes] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
@@ -314,6 +317,11 @@ export function DeliveryNotesPage() {
     date: new Date().toISOString().slice(0, 10),
     postingDate: '',
     notes: '',
+    transporter: '',
+    trackingNo: '',
+    expectedDeliveryAt: '',
+    recipientEmail: '',
+    sendEmailApproved: true,
   });
   const [deliveryRows, setDeliveryRows] = useState<any[]>([{ productId: '', description: '', quantity: 1 }]);
   const [totalRows, setTotalRows] = useState(0);
@@ -331,9 +339,20 @@ export function DeliveryNotesPage() {
       setNotes(items(noteRes.data));
       setTotalRows(total(noteRes.data));
       setCustomers(items(customerRes.data));
-      setOrders(items(orderRes.data).filter((order: any) => !['DRAFT', 'CANCELLED', 'CLOSED'].includes(order.status)));
-      setWarehouses(items(warehouseRes.data));
+      const availableOrders = items(orderRes.data).filter((order: any) => !['DRAFT', 'CANCELLED', 'CLOSED', 'DELIVERED'].includes(order.status));
+      const availableWarehouses = items(warehouseRes.data);
+      setOrders(availableOrders);
+      setWarehouses(availableWarehouses);
       setProducts(items(productRes.data).filter((product: any) => product.type !== 'SERVICE'));
+      if (requestedOrderId && !requestedOrderApplied.current) {
+        const requested = availableOrders.find((order: any) => order.id === requestedOrderId);
+        if (requested) {
+          requestedOrderApplied.current = true;
+          setForm((prev) => ({ ...prev, salesOrderId: requested.id, customerId: requested.customerId, warehouseId: requested.sourceWarehouseId || availableWarehouses[0]?.id || '', recipientEmail: requested.customer?.email || '', expectedDeliveryAt: requested.deliveryDate ? String(requested.deliveryDate).slice(0, 16) : '' }));
+          setDeliveryRows(requested.items.map((item: any) => ({ salesOrderItemId: item.id, productId: item.productId, description: item.description || item.product?.name || '', quantity: Math.max(0, Number(item.quantity) - Number(item.dispatchedQty || 0) - Number(item.shortClosedQty || 0)), maximum: Math.max(0, Number(item.quantity) - Number(item.dispatchedQty || 0) - Number(item.shortClosedQty || 0)), warehouseId: item.sourceWarehouseId || requested.sourceWarehouseId || availableWarehouses[0]?.id || '' })).filter((item: any) => item.maximum > 0));
+          setOpen(true);
+        }
+      }
     } catch (err: any) {
       showApiError(err, 'Failed to load delivery notes');
     } finally {
@@ -373,9 +392,13 @@ export function DeliveryNotesPage() {
 
   const createFromOrder = async () => {
     if (!form.salesOrderId) return toast.error('Select a sales order');
+    const rows = deliveryRows.filter((row) => row.salesOrderItemId && Number(row.quantity) > 0);
+    if (!rows.length) return toast.error('Enter at least one dispatch quantity');
+    if (rows.some((row) => !row.warehouseId)) return toast.error('Select a warehouse for every dispatched product');
+    if (rows.some((row) => Number(row.quantity) > Number(row.maximum))) return toast.error('Dispatch quantity cannot exceed the remaining order quantity');
     try {
-      await api.post(`/delivery-notes/from-sales-order/${form.salesOrderId}`);
-      showApiSuccess('Draft delivery note created from sales order');
+      await api.post(`/delivery-notes/from-sales-order/${form.salesOrderId}/dispatch`, { transporter: form.transporter, trackingNo: form.trackingNo, expectedDeliveryAt: form.expectedDeliveryAt || undefined, notes: form.notes, recipientEmail: form.recipientEmail, sendEmailApproved: form.sendEmailApproved, items: rows.map(row => ({ salesOrderItemId: row.salesOrderItemId, warehouseId: row.warehouseId, quantity: Number(row.quantity) })) });
+      showApiSuccess('Dispatch posted and delivery tracking created');
       setOpen(false);
       resetDeliveryForm();
       load();
@@ -413,6 +436,7 @@ export function DeliveryNotesPage() {
       date: new Date().toISOString().slice(0, 10),
       postingDate: '',
       notes: '',
+      transporter: '', trackingNo: '', expectedDeliveryAt: '', recipientEmail: '', sendEmailApproved: true,
     });
     setDeliveryRows([{ productId: '', description: '', quantity: 1 }]);
   };
@@ -434,22 +458,27 @@ export function DeliveryNotesPage() {
           data={notes}
           isLoading={isLoading}
           columns={[
-            { key: 'deliveryNo', header: 'Delivery #' },
+            { key: 'deliveryNo', header: 'Delivery #', render: (n: any) => <Link className="font-mono font-semibold text-blue-600 hover:underline" href={`/invoicing/delivery-notes/${n.id}`}>{n.deliveryNo}</Link> },
             { key: 'customer', header: 'Customer', render: (n: any) => n.customer?.name || '-' },
             { key: 'salesOrder', header: 'Sales Order', render: (n: any) => n.salesOrder?.orderNo || '-' },
             { key: 'warehouse', header: 'Warehouse', render: (n: any) => n.warehouse?.name || 'Main Warehouse' },
             { key: 'date', header: 'Date', render: (n: any) => formatDate(n.date) },
             { key: 'status', header: 'Status', render: (n: any) => <StatusBadge status={n.status} /> },
+            { key: 'shipmentStatus', header: 'Shipment', render: (n: any) => <div><StatusBadge status={n.shipmentStatus || 'NOT_DISPATCHED'} />{n.trackingNo && <p className="mt-1 text-xs text-gray-500">LR {n.trackingNo}</p>}</div> },
             { key: 'items', header: 'Items', render: (n: any) => n.items?.length || 0 },
             {
               key: 'actions',
               header: '',
               render: (n: any) => (
                 <div className="flex justify-end gap-2">
+                  <Button asChild size="sm" variant="outline"><Link href={`/invoicing/delivery-notes/${n.id}`}>Open Workspace</Link></Button>
                   {n.status === 'DRAFT' && (
                     <Button size="sm" onClick={() => setStatus(n.id, 'SUBMITTED')}>
                       Submit
                     </Button>
+                  )}
+                  {n.status === 'SUBMITTED' && (
+                    <Button asChild size="sm" variant="outline"><Link href={`/invoicing/delivery-notes/${n.id}`}>Track Shipment</Link></Button>
                   )}
                   {n.status === 'SUBMITTED' && (
                     <Button size="sm" onClick={() => createInvoice(n.id)}>
@@ -498,10 +527,13 @@ export function DeliveryNotesPage() {
                     if (order?.items?.length) {
                       setDeliveryRows(
                         order.items.map((item: any) => ({
+                          salesOrderItemId: item.id,
                           productId: item.productId,
                           description: item.description || item.product?.name || '',
-                          quantity: Number(item.quantity || 1),
-                        }))
+                          quantity: Math.max(0, Number(item.quantity) - Number(item.dispatchedQty || 0) - Number(item.shortClosedQty || 0)),
+                          maximum: Math.max(0, Number(item.quantity) - Number(item.dispatchedQty || 0) - Number(item.shortClosedQty || 0)),
+                          warehouseId: item.sourceWarehouseId || order.sourceWarehouseId || warehouses[0]?.id || '',
+                        })).filter((item: any) => item.maximum > 0)
                       );
                     }
                   }}
@@ -551,7 +583,7 @@ export function DeliveryNotesPage() {
                   </SelectContent>
                 </Select>
               </Field>
-              <Field label="Warehouse">
+              {!form.salesOrderId && <Field label="Warehouse">
                 <Select
                   value={form.warehouseId}
                   onValueChange={(value) => setForm((prev) => ({ ...prev, warehouseId: value }))}
@@ -576,7 +608,7 @@ export function DeliveryNotesPage() {
                     )}
                   </SelectContent>
                 </Select>
-              </Field>
+              </Field>}
               <Field label="Date">
                 <Input
                   type="date"
@@ -598,27 +630,30 @@ export function DeliveryNotesPage() {
                   placeholder="Transporter, LR number, delivery remarks"
                 />
               </Field>
+              {form.salesOrderId && <><Field label="Transporter"><Input value={form.transporter} onChange={(event) => setForm((prev) => ({ ...prev, transporter: event.target.value }))} /></Field><Field label="LR / Tracking"><Input value={form.trackingNo} onChange={(event) => setForm((prev) => ({ ...prev, trackingNo: event.target.value }))} /></Field><Field label="Expected Delivery"><Input type="datetime-local" value={form.expectedDeliveryAt} onChange={(event) => setForm((prev) => ({ ...prev, expectedDeliveryAt: event.target.value }))} /></Field><Field label="Customer Email"><Input type="email" value={form.recipientEmail} onChange={(event) => setForm((prev) => ({ ...prev, recipientEmail: event.target.value }))} /></Field></>}
             </div>
 
             {selectedOrder && (
               <div className="rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-800">
-                Source {selectedOrder.orderNo}: {selectedOrder.items?.length || 0} item(s) will be copied into the draft delivery note.
+                Source {selectedOrder.orderNo}: only remaining quantities are shown below. Confirming will immediately post stock and create shipment tracking.
               </div>
             )}
 
-            <DeliveryRows rows={deliveryRows} products={products} onChange={setDeliveryRows} />
+            <DeliveryRows rows={deliveryRows} products={products} warehouses={warehouses} fromOrder={Boolean(form.salesOrderId)} onChange={setDeliveryRows} />
+
+            {form.salesOrderId && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.sendEmailApproved} onChange={(event) => setForm((prev) => ({ ...prev, sendEmailApproved: event.target.checked }))} />Approve dispatch email to the entered customer email</label>}
 
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setOpen(false)}>
                 Cancel
               </Button>
               {form.salesOrderId && (
-                <Button variant="outline" onClick={createFromOrder}>
+                <Button onClick={createFromOrder}>
                   <Truck className="mr-2 h-4 w-4" />
-                  Create from Sales Order
+                  Confirm and Post Dispatch
                 </Button>
               )}
-              <Button onClick={createManual}>Create Manual Draft</Button>
+              {!form.salesOrderId && <Button onClick={createManual}>Create Manual Draft</Button>}
             </div>
           </div>
         </DialogContent>
@@ -627,7 +662,28 @@ export function DeliveryNotesPage() {
   );
 }
 
-function DeliveryRows({ rows, products, onChange }: { rows: any[]; products: any[]; onChange: (rows: any[]) => void }) {
+function DeliveryTrackingWorkspace({ note, order: listedOrder, orderNotes, onClose, onShipment, onCreateInvoice }: any) {
+  const [values, setValues] = useState<any>({});
+  useEffect(() => { if (note) setValues({ transporter: note.transporter || '', trackingNo: note.trackingNo || '', expectedDeliveryAt: note.expectedDeliveryAt ? String(note.expectedDeliveryAt).slice(0, 16) : '', proofOfDelivery: note.proofOfDelivery || '', failedDeliveryReason: note.failedDeliveryReason || '', recipientEmail: note.customer?.email || '', sendEmailApproved: false }); }, [note]);
+  if (!note) return null;
+  const order = listedOrder || note.salesOrder;
+  const lines = (order?.items || []).map((item: any) => {
+    const dispatches = orderNotes.flatMap((delivery: any) => (delivery.items || []).filter((row: any) => row.salesOrderItemId === item.id || row.productId === item.productId).map((row: any) => ({ ...row, deliveryNo: delivery.deliveryNo, shipmentStatus: delivery.shipmentStatus, dispatchedAt: delivery.dispatchedAt })));
+    const ordered = Number(item.quantity || 0), dispatched = Number(item.dispatchedQty || 0), delivered = Number(item.deliveredQty || 0), returned = Number(item.returnedQty || 0), shortClosed = Number(item.shortClosedQty || 0);
+    return { ...item, dispatches, ordered, dispatched, delivered, returned, remainingDispatch: Math.max(0, ordered - dispatched - shortClosed), remainingDelivery: Math.max(0, ordered - delivered - shortClosed) };
+  });
+  const total = (key: string) => lines.reduce((sum: number, line: any) => sum + Number(line[key] || 0), 0);
+  const update = (patch: any) => setValues((current: any) => ({ ...current, ...patch }));
+  const move = (status: string) => onShipment(note, status, values);
+  return <Dialog open onOpenChange={open => !open && onClose()}><DialogContent className="max-w-7xl"><DialogHeader><DialogTitle>Delivery workspace · {note.salesOrder?.orderNo || order?.orderNo}</DialogTitle></DialogHeader><div className="max-h-[82vh] space-y-5 overflow-y-auto pr-2">
+    <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">{[['Ordered','ordered'],['Dispatched','dispatched'],['Delivered','delivered'],['Returned','returned'],['Remaining dispatch','remainingDispatch'],['Remaining delivery','remainingDelivery']].map(([label,key]) => <div key={key} className="rounded-lg border bg-gray-50 p-3"><p className="text-xs uppercase text-gray-500">{label}</p><p className="text-xl font-semibold">{total(key)}</p></div>)}</div>
+    <div className="overflow-x-auto rounded-lg border"><table className="min-w-[1100px] w-full text-sm"><thead className="bg-gray-50"><tr>{['Product','Ordered','Dispatched','Delivered','Returned','Remaining dispatch','Remaining delivery','Dispatch history'].map(label => <th key={label} className="p-3 text-right first:text-left">{label}</th>)}</tr></thead><tbody>{lines.map((line: any) => <tr key={line.id} className="border-t align-top"><td className="p-3"><p className="font-medium">{line.product?.name}</p><p className="text-xs text-gray-500">{line.product?.sku}</p></td>{['ordered','dispatched','delivered','returned','remainingDispatch','remainingDelivery'].map(key => <td key={key} className={`p-3 text-right ${key.startsWith('remaining') && line[key] > 0 ? 'font-semibold text-amber-700' : ''}`}>{line[key]}</td>)}<td className="p-3 text-right">{line.dispatches.map((row: any) => <p key={row.id} className="whitespace-nowrap text-xs">{row.deliveryNo}: {Number(row.quantity)} · {row.shipmentStatus}</p>)}</td></tr>)}</tbody></table></div>
+    <div className="rounded-lg border p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-mono font-semibold">{note.deliveryNo}</p><p className="text-sm text-gray-500">Created {formatDate(note.date)} · expected {note.expectedDeliveryAt ? formatDate(note.expectedDeliveryAt) : 'not set'}</p></div><StatusBadge status={note.shipmentStatus || note.status} /></div><div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-5"><Field label="Transporter"><Input value={values.transporter || ''} onChange={e => update({ transporter: e.target.value })} /></Field><Field label="LR / Tracking"><Input value={values.trackingNo || ''} onChange={e => update({ trackingNo: e.target.value })} /></Field><Field label="Expected delivery"><Input type="datetime-local" value={values.expectedDeliveryAt || ''} onChange={e => update({ expectedDeliveryAt: e.target.value })} /></Field><Field label="Proof / receiver"><Input value={values.proofOfDelivery || ''} onChange={e => update({ proofOfDelivery: e.target.value })} /></Field><Field label="Failure reason"><Input value={values.failedDeliveryReason || ''} onChange={e => update({ failedDeliveryReason: e.target.value })} /></Field></div><label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" checked={!!values.sendEmailApproved} onChange={e => update({ sendEmailApproved: e.target.checked })} />Approve delivery email</label>{values.sendEmailApproved && <Input className="mt-2 max-w-md" type="email" value={values.recipientEmail || ''} onChange={e => update({ recipientEmail: e.target.value })} />}</div>
+    <div className="flex flex-wrap justify-end gap-2"><Button variant="outline" onClick={onClose}>Close</Button>{note.status === 'SUBMITTED' && !['DELIVERED','RETURNED'].includes(note.shipmentStatus) && <><Button variant="outline" onClick={() => move('IN_TRANSIT')}>Mark In Transit</Button><Button variant="destructive" disabled={!values.failedDeliveryReason?.trim()} onClick={() => move('FAILED')}>Record Failed Delivery</Button><Button disabled={!values.proofOfDelivery?.trim()} onClick={() => move('DELIVERED')}>Confirm Delivered</Button></>}{note.shipmentStatus === 'DELIVERED' && <Button variant="destructive" onClick={() => move('RETURNED')}>Record Full Return</Button>}{note.status === 'SUBMITTED' && <Button onClick={() => onCreateInvoice(note.id)}>Create Invoice</Button>} {order && total('remainingDispatch') > 0 && <Button asChild><Link href={`/invoicing/delivery-notes?salesOrderId=${order.id}`}>Create Next Partial Dispatch</Link></Button>}</div>
+  </div></DialogContent></Dialog>;
+}
+
+function DeliveryRows({ rows, products, warehouses = [], fromOrder = false, onChange }: { rows: any[]; products: any[]; warehouses?: any[]; fromOrder?: boolean; onChange: (rows: any[]) => void }) {
   const update = (index: number, patch: any) =>
     onChange(rows.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   const add = () => onChange([...rows, { productId: '', description: '', quantity: 1 }]);
@@ -635,15 +691,16 @@ function DeliveryRows({ rows, products, onChange }: { rows: any[]; products: any
 
   return (
     <div className="rounded-md border border-[#e5e2dc] bg-white">
-      <div className="grid grid-cols-[2fr_2fr_120px_48px] border-b border-[#e5e2dc] bg-[#f8faf9] px-3 py-2 text-xs font-semibold uppercase text-[#6b7280]">
+      <div className={`grid ${fromOrder ? 'grid-cols-[2fr_2fr_160px_100px]' : 'grid-cols-[2fr_2fr_120px_48px]'} border-b border-[#e5e2dc] bg-[#f8faf9] px-3 py-2 text-xs font-semibold uppercase text-[#6b7280]`}>
         <span>Product</span>
         <span>Description</span>
+        {fromOrder && <span>Warehouse</span>}
         <span>Qty</span>
-        <span />
+        {!fromOrder && <span />}
       </div>
       <div className="divide-y divide-[#f0ede8]">
         {rows.map((row, index) => (
-          <div key={index} className="grid grid-cols-[2fr_2fr_120px_48px] gap-2 px-3 py-2">
+          <div key={index} className={`grid ${fromOrder ? 'grid-cols-[2fr_2fr_160px_100px]' : 'grid-cols-[2fr_2fr_120px_48px]'} gap-2 px-3 py-2`}>
             <Select
               value={row.productId}
               onValueChange={(value) => {
@@ -658,7 +715,7 @@ function DeliveryRows({ rows, products, onChange }: { rows: any[]; products: any
               <SelectTrigger>
                 <SelectValue placeholder="Select product" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent searchable searchPlaceholder="Search products…">
                 {products.length === 0 ? (
                   <SelectEmptyState
                     message="No products found"
@@ -678,25 +735,27 @@ function DeliveryRows({ rows, products, onChange }: { rows: any[]; products: any
               value={row.description || ''}
               onChange={(event) => update(index, { description: event.target.value })}
             />
+            {fromOrder && <Select value={row.warehouseId || ''} onValueChange={(value) => update(index, { warehouseId: value })}><SelectTrigger><SelectValue placeholder="Warehouse" /></SelectTrigger><SelectContent searchable searchPlaceholder="Search warehouses…">{warehouses.map((warehouse) => <SelectItem key={warehouse.id} value={warehouse.id}>{warehouse.code} · {warehouse.name}</SelectItem>)}</SelectContent></Select>}
             <Input
               type="number"
-              min="0.000001"
+              min={fromOrder ? 0 : 0.000001}
+              max={fromOrder ? row.maximum : undefined}
               step="0.000001"
               value={row.quantity}
               onChange={(event) => update(index, { quantity: Number(event.target.value) })}
             />
-            <Button variant="ghost" size="icon" onClick={() => remove(index)}>
+            {!fromOrder && <Button variant="ghost" size="icon" onClick={() => remove(index)}>
               <Trash2 className="h-4 w-4" />
-            </Button>
+            </Button>}
           </div>
         ))}
       </div>
-      <div className="border-t border-[#e5e2dc] p-2">
+      {!fromOrder && <div className="border-t border-[#e5e2dc] p-2">
         <Button type="button" size="sm" variant="outline" onClick={add}>
           <Plus className="mr-2 h-4 w-4" />
           Add Row
         </Button>
-      </div>
+      </div>}
     </div>
   );
 }

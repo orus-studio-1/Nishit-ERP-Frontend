@@ -3,6 +3,8 @@ export interface LineItemRow {
   productId: string;
   itemCode?: string;
   description: string;
+  hsnCode?: string;
+  brand?: string;
   quantity: number;
   unitPrice: number;
   discount: number;
@@ -18,6 +20,9 @@ export interface ProductOption {
   name: string;
   salePrice: number;
   taxRate: number;
+  hsnCode?: string | null;
+  brand?: string | null;
+  manufacturer?: string | null;
   defaultTaxTemplateId?: string | null;
   defaultTaxTemplate?: { id: string; name: string; code: string; lines?: { rate: number }[] } | null;
   unitId?: string | null;

@@ -292,7 +292,7 @@ export default function StockEntriesPage() {
                           <SelectTrigger>
                             <SelectValue placeholder="Select product" />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent searchable searchPlaceholder="Search products…">
                             {products.length === 0 ? (
                               <SelectEmptyState
                                 message="No products found"
@@ -319,7 +319,7 @@ export default function StockEntriesPage() {
                           <SelectTrigger>
                             <SelectValue placeholder="Optional row warehouse" />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent searchable searchPlaceholder="Search warehouses…">
                             {warehouses.length === 0 ? (
                               <SelectEmptyState
                                 message="No warehouses found"
@@ -369,8 +369,8 @@ export default function StockEntriesPage() {
                           Remove
                         </Button>
                       </td>
-                      <td className="px-3 py-2"><div className="space-y-1"><select className="h-8 w-36 rounded border px-2" value={row.batchId} onChange={(e) => setRows((prev) => prev.map((r, i) => i === index ? { ...r, batchId: e.target.value, batchNo: '' } : r))}><option value="">Existing batch</option>{batches.filter((batch) => batch.productId === row.productId && (!row.warehouseId || batch.warehouseId === row.warehouseId)).map((batch) => <option key={batch.id} value={batch.id}>{batch.batchNo}</option>)}</select>{!row.batchId && <Input className="h-8 w-36" placeholder="New batch no" value={row.batchNo} onChange={(e) => setRows((prev) => prev.map((r, i) => i === index ? { ...r, batchNo: e.target.value } : r))} />}</div></td>
-                      <td className="px-3 py-2"><div className="space-y-1"><select className="h-8 w-36 rounded border px-2" value={row.serialNoId} onChange={(e) => setRows((prev) => prev.map((r, i) => i === index ? { ...r, serialNoId: e.target.value, serialNo: '' } : r))}><option value="">Existing serial</option>{serials.filter((serial) => serial.productId === row.productId && (!row.warehouseId || serial.warehouseId === row.warehouseId)).map((serial) => <option key={serial.id} value={serial.id}>{serial.serialNo}</option>)}</select>{!row.serialNoId && <Input className="h-8 w-36" placeholder="New serial no" value={row.serialNo} onChange={(e) => setRows((prev) => prev.map((r, i) => i === index ? { ...r, serialNo: e.target.value } : r))} />}</div></td>
+                      <td className="px-3 py-2"><div className="w-36 space-y-1"><Select value={row.batchId || '__new__'} onValueChange={(value) => setRows((prev) => prev.map((r, i) => i === index ? { ...r, batchId: value === '__new__' ? '' : value, batchNo: '' } : r))}><SelectTrigger><SelectValue placeholder="Existing batch" /></SelectTrigger><SelectContent searchable searchPlaceholder="Search batches…"><SelectItem value="__new__">Create new batch</SelectItem>{batches.filter((batch) => batch.productId === row.productId && (!row.warehouseId || batch.warehouseId === row.warehouseId)).map((batch) => <SelectItem key={batch.id} value={batch.id}>{batch.batchNo}</SelectItem>)}</SelectContent></Select>{!row.batchId && <Input className="h-8 w-36" placeholder="New batch no" value={row.batchNo} onChange={(e) => setRows((prev) => prev.map((r, i) => i === index ? { ...r, batchNo: e.target.value } : r))} />}</div></td>
+                      <td className="px-3 py-2"><div className="w-36 space-y-1"><Select value={row.serialNoId || '__new__'} onValueChange={(value) => setRows((prev) => prev.map((r, i) => i === index ? { ...r, serialNoId: value === '__new__' ? '' : value, serialNo: '' } : r))}><SelectTrigger><SelectValue placeholder="Existing serial" /></SelectTrigger><SelectContent searchable searchPlaceholder="Search serials…"><SelectItem value="__new__">Create new serial</SelectItem>{serials.filter((serial) => serial.productId === row.productId && (!row.warehouseId || serial.warehouseId === row.warehouseId)).map((serial) => <SelectItem key={serial.id} value={serial.id}>{serial.serialNo}</SelectItem>)}</SelectContent></Select>{!row.serialNoId && <Input className="h-8 w-36" placeholder="New serial no" value={row.serialNo} onChange={(e) => setRows((prev) => prev.map((r, i) => i === index ? { ...r, serialNo: e.target.value } : r))} />}</div></td>
                     </tr>
                   ))}
                 </tbody>
@@ -427,7 +427,7 @@ function WarehouseSelect({
         <SelectTrigger>
           <SelectValue placeholder="Select warehouse" />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent searchable searchPlaceholder="Search warehouses…">
           {warehouses.length === 0 ? (
             <SelectEmptyState
               message="No warehouses found"

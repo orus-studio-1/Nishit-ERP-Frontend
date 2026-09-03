@@ -150,7 +150,7 @@ export default function LeadDetailPage() {
               <Info label="Priority">
                 <StatusBadge status={lead.priority} />
               </Info>
-              <Info label="Estimated Value">{lead.value ? formatCurrency(lead.value, 'USD') : '-'}</Info>
+              <Info label="Estimated Value">{lead.value ? formatCurrency(lead.value, 'INR') : '-'}</Info>
               <Info label="Email">{lead.email || '-'}</Info>
               <Info label="Phone">{lead.phone || '-'}</Info>
               <Info label="Source">{lead.source}</Info>

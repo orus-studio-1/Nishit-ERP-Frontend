@@ -666,7 +666,7 @@ function DocumentFields({ kind, form, setForm, suppliers, products, orders, rece
               <SelectTrigger>
                 <SelectValue placeholder="Select supplier" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent searchable searchPlaceholder="Search products…">
                 {suppliers.length === 0 ? (
                   <SelectEmptyState
                     message="No suppliers found"
@@ -692,7 +692,7 @@ function DocumentFields({ kind, form, setForm, suppliers, products, orders, rece
               <SelectTrigger>
                 <SelectValue placeholder="Select item" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent searchable searchPlaceholder="Search products…">
                 {products.length === 0 ? (
                   <SelectEmptyState
                     message="No products found"

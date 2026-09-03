@@ -164,7 +164,7 @@ export default function OpportunitiesPage() {
             <div className="border-b border-[#e5e2dc] p-3">
               <StatusBadge status={column.stage} />
               <p className="mt-1 text-xs text-[#6b7280]">
-                {column.count} deals · {formatCurrency(column.totalValue || 0, 'USD')}
+                {column.count} deals · {formatCurrency(column.totalValue || 0, 'INR')}
               </p>
             </div>
             <div className="space-y-2 p-2">

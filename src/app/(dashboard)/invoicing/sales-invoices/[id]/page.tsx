@@ -74,7 +74,7 @@ export default function SalesInvoiceDetailPage() {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [printFormats, setPrintFormats] = useState<any[]>([]);
   const [printFormatId, setPrintFormatId] = useState('');
-  const [form, setForm] = useState({ customerId: '', date: '', dueDate: '', notes: '', terms: '', currency: 'USD' });
+  const [form, setForm] = useState({ customerId: '', date: '', dueDate: '', notes: '', terms: '', currency: 'INR' });
   const [rows, setRows] = useState<LineItemRow[]>([]);
   const [payment, setPayment] = useState({ amount: '', date: new Date().toISOString().slice(0, 10), method: 'BANK_TRANSFER' as PaymentMethod, reference: '', notes: '' });
 

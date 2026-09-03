@@ -166,7 +166,7 @@ function RevenueChart({ rows }: { rows: any[] }) {
       <AreaChart data={rows}>
         <CartesianGrid strokeDasharray="3 3" stroke="#f0ede8" />
         <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-        <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `$${(Number(v) / 1000).toFixed(0)}k`} />
+        <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `₹${(Number(v) / 1000).toFixed(0)}k`} />
         <Tooltip formatter={(v: any) => formatCurrency(Number(v || 0))} />
         <Area type="monotone" dataKey="revenue" stroke="#2490ef" fill="#dff0ff" strokeWidth={2} />
       </AreaChart>

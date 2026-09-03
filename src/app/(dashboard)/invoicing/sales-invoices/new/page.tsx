@@ -152,7 +152,7 @@ export default function NewSalesInvoicePage() {
                 <SelectTrigger>
                   <SelectValue placeholder="Select customer" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent searchable searchPlaceholder="Search customers…">
                   {customers.length === 0 ? (
                     <SelectEmptyState
                       message="No customers found"

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Plus, FileText, AlertCircle, ArrowRight, Pencil } from 'lucide-react';
+import { Plus, FileText, AlertCircle, ArrowRight, Pencil, Download } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
 import { Pagination } from '@/components/shared/Pagination';
@@ -27,6 +27,7 @@ export default function QuotationsPage() {
   const router = useRouter();
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
+  const [quotationDefaults, setQuotationDefaults] = useState<any>({});
   const [sourceQuotation, setSourceQuotation] = useState<Quotation | null>(null);
   const [newOpen, setNewOpen] = useState(false);
   const [editingQuotation, setEditingQuotation] = useState<Quotation | null>(null);
@@ -38,7 +39,8 @@ export default function QuotationsPage() {
     customerId: '',
     date: new Date().toISOString().slice(0, 10),
     validUntil: '',
-    currency: 'USD',
+    currency: 'INR',
+    customerNameSnapshot: '', customerSiteAddress: '', deliveryTerms: '', deliveryCharges: 0, deliveryChargesNote: '',
     notes: '',
     terms: '',
   });
@@ -65,8 +67,9 @@ export default function QuotationsPage() {
 
   const fetchCustomers = async () => {
     try {
-      const res = await api.get('/customers', { params: { limit: 200, isActive: true } });
+      const [res, tenant] = await Promise.all([api.get('/customers', { params: { limit: 200, isActive: true } }), api.get('/platform/tenant')]);
       setCustomers(res.data?.data?.items || res.data?.data || []);
+      setQuotationDefaults(tenant.data?.data?.companies?.[0]?.quotationDefaults || {});
     } catch (err: any) {
       showApiError(err, 'Failed to load customers');
     }
@@ -115,6 +118,7 @@ export default function QuotationsPage() {
       showApiError(err, `Quotation ${operation} failed`);
     }
   };
+  const openPdf = async (quotation: Quotation) => { try { const response = await api.get(`/sales/quotations/${quotation.id}/artifact`, { responseType: 'blob' }); const url = URL.createObjectURL(response.data); window.open(url, '_blank', 'noopener,noreferrer'); window.setTimeout(() => URL.revokeObjectURL(url), 60000); } catch (error) { showApiError(error, 'Send the quotation once to generate its preserved PDF'); } };
 
   const createQuotation = async () => {
     if (isSubmitting) return;
@@ -143,6 +147,8 @@ export default function QuotationsPage() {
         taxTemplateId: row.taxTemplateId || undefined,
         taxRate: Number(row.taxRate || 0),
         discount: Number(row.discount || 0),
+        hsnCode: row.hsnCode?.trim() || undefined,
+        brand: row.brand?.trim() || undefined,
       }));
 
     if (!items.length) {
@@ -163,8 +169,9 @@ export default function QuotationsPage() {
 
     setIsSubmitting(true);
     try {
-      if (editingQuotation) await api.put(`/sales/quotations/${editingQuotation.id}`, { ...form, items });
-      else await api.post('/sales/quotations', { ...form, items });
+      const body = { ...form, currency: 'INR', shippingAddressSnapshot: { address: form.customerSiteAddress }, items };
+      if (editingQuotation) await api.put(`/sales/quotations/${editingQuotation.id}`, body);
+      else await api.post('/sales/quotations', body);
       showApiSuccess(`Quotation ${editingQuotation ? 'updated' : 'created'} successfully`);
       setNewOpen(false);
       setEditingQuotation(null);
@@ -172,7 +179,8 @@ export default function QuotationsPage() {
         customerId: '',
         date: new Date().toISOString().slice(0, 10),
         validUntil: '',
-        currency: 'USD',
+        currency: 'INR',
+        customerNameSnapshot: '', customerSiteAddress: '', deliveryTerms: '', deliveryCharges: 0, deliveryChargesNote: '',
         notes: '',
         terms: '',
       });
@@ -187,8 +195,8 @@ export default function QuotationsPage() {
     }
   };
 
-  const openCreate = () => { setEditingQuotation(null); setForm({ customerId: '', date: new Date().toISOString().slice(0, 10), validUntil: '', currency: 'USD', notes: '', terms: '' }); setRows([{ productId: '', itemCode: '', description: '', quantity: 1, unitPrice: 0, discount: 0, taxRate: 0, total: 0 }]); setNewOpen(true); };
-  const openEdit = (quotation: Quotation) => { setEditingQuotation(quotation); setForm({ customerId: quotation.customerId || '', date: String(quotation.date).slice(0, 10), validUntil: quotation.validUntil ? String(quotation.validUntil).slice(0, 10) : '', currency: quotation.currency || 'USD', notes: quotation.notes || '', terms: quotation.terms || '' }); setRows((quotation.items || []).map((item: any) => ({ productId: item.productId || '', itemCode: item.itemCode || item.product?.sku || '', description: item.description || item.product?.name || '', quantity: Number(item.quantity), unitPrice: Number(item.unitPrice), discount: Number(item.discount || 0), taxRate: Number(item.taxRate || 0), total: Number(item.total || 0) }))); setNewOpen(true); };
+  const openCreate = () => { setEditingQuotation(null); setForm({ customerId: '', date: new Date().toISOString().slice(0, 10), validUntil: '', currency: 'INR', customerNameSnapshot: '', customerSiteAddress: '', deliveryTerms: quotationDefaults.deliveryTerms || '', deliveryCharges: 0, deliveryChargesNote: quotationDefaults.deliveryChargesNote || '', notes: '', terms: quotationDefaults.terms || '' }); setRows([{ productId: '', itemCode: '', description: '', quantity: 1, unitPrice: 0, discount: 0, taxRate: 0, total: 0 }]); setNewOpen(true); };
+  const openEdit = (quotation: Quotation) => { const q = quotation as any; setEditingQuotation(quotation); setForm({ customerId: quotation.customerId || '', date: String(quotation.date).slice(0, 10), validUntil: quotation.validUntil ? String(quotation.validUntil).slice(0, 10) : '', currency: 'INR', customerNameSnapshot: q.customerNameSnapshot || q.customer?.name || '', customerSiteAddress: q.shippingAddressSnapshot?.address || '', deliveryTerms: q.deliveryTerms || '', deliveryCharges: Number(q.deliveryCharges || 0), deliveryChargesNote: q.deliveryChargesNote || '', notes: quotation.notes || '', terms: quotation.terms || '' }); setRows((quotation.items || []).map((item: any) => ({ productId: item.productId || '', itemCode: item.itemCode || item.product?.sku || '', description: item.description || item.product?.name || '', hsnCode: item.hsnCode || item.product?.hsnCode || '', brand: item.brand || item.product?.brand || item.product?.manufacturer || '', quantity: Number(item.quantity), unitPrice: Number(item.unitPrice), discount: Number(item.discount || 0), taxRate: Number(item.taxRate || 0), total: Number(item.total || 0) }))); setNewOpen(true); };
 
   const columns = [
     {
@@ -215,7 +223,8 @@ export default function QuotationsPage() {
       render: (q: Quotation) => <div className="flex flex-wrap justify-end gap-1">
         {q.status === 'DRAFT' && !(q as any).submittedAt && <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); openEdit(q); }}><Pencil className="mr-1 h-3.5 w-3.5" />Edit</Button>}
         {q.status === 'DRAFT' && !(q as any).submittedAt && <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); quotationAction(q, 'submit'); }}>Submit</Button>}
-        {q.status === 'DRAFT' && Boolean((q as any).submittedAt) && <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setActionValue((q.customer as any)?.email || ''); setActionDialog({ quotation: q, operation: 'send' }); }}>Email Rates</Button>}
+        {String(q.status) === 'APPROVED' && <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setActionValue((q.customer as any)?.email || ''); setActionDialog({ quotation: q, operation: 'send' }); }}>Email Quotation</Button>}
+        {['SENT', 'VIEWED', 'UNDER_NEGOTIATION', 'ACCEPTED', 'SUPERSEDED'].includes(String(q.status)) && <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); openPdf(q); }}><Download className="mr-1 h-3.5 w-3.5" />PDF</Button>}
         {q.status === 'SENT' && <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); quotationAction(q, 'accept'); }}>Accept</Button>}
         {q.status === 'SENT' && <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setActionValue(''); setActionDialog({ quotation: q, operation: 'reject' }); }}>Reject</Button>}
         {['SENT', 'ACCEPTED', 'REJECTED'].includes(q.status) && <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); quotationAction(q, 'revise'); }}>Revise</Button>}
@@ -336,14 +345,16 @@ export default function QuotationsPage() {
                     setForm((prev) => ({
                       ...prev,
                       customerId: value,
-                      currency: customer?.currency || prev.currency,
+                      currency: 'INR',
+                      customerNameSnapshot: customer?.name || '',
+                      customerSiteAddress: [customer?.address, customer?.city, customer?.state, customer?.zip].filter(Boolean).join(', '),
                     }));
                   }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select customer" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent searchable searchPlaceholder="Search customers…">
                     {customers.length === 0 ? (
                       <SelectEmptyState
                         message="No customers found"
@@ -364,7 +375,7 @@ export default function QuotationsPage() {
                 <Label>Currency</Label>
                 <Input
                   value={form.currency}
-                  onChange={(event) => setForm((prev) => ({ ...prev, currency: event.target.value }))}
+                  disabled
                 />
               </div>
               <div className="space-y-1.5">
@@ -385,7 +396,11 @@ export default function QuotationsPage() {
               </div>
             </div>
 
+            <div className="grid gap-3 md:grid-cols-2"><div className="space-y-1.5"><Label>Customer name on quotation</Label><Input value={form.customerNameSnapshot} onChange={event => setForm(prev => ({ ...prev, customerNameSnapshot: event.target.value }))} /></div><div className="space-y-1.5"><Label>Customer site address</Label><Input value={form.customerSiteAddress} onChange={event => setForm(prev => ({ ...prev, customerSiteAddress: event.target.value }))} /></div></div>
+
             <LineItemGrid value={rows} onChange={setRows} currency={form.currency} />
+
+            <div className="grid gap-3 md:grid-cols-2"><div className="space-y-1.5"><Label>Delivery note / delivery terms</Label><Textarea value={form.deliveryTerms} onChange={event => setForm(prev => ({ ...prev, deliveryTerms: event.target.value }))} /></div><div className="space-y-1.5"><Label>Terms and conditions</Label><Textarea value={form.terms} onChange={event => setForm(prev => ({ ...prev, terms: event.target.value }))} /></div><div className="space-y-1.5"><Label>Delivery charges note</Label><Input value={form.deliveryChargesNote} onChange={event => setForm(prev => ({ ...prev, deliveryChargesNote: event.target.value }))} /></div><div className="space-y-1.5"><Label>Delivery charges amount (INR)</Label><Input type="number" min="0" step="0.01" value={form.deliveryCharges} onChange={event => setForm(prev => ({ ...prev, deliveryCharges: Number(event.target.value) }))} /></div></div>
 
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setNewOpen(false)}>

@@ -133,6 +133,7 @@ export interface Product {
   unitId?: string;
   unit?: Unit;
   type: ProductType;
+  supplyPolicy?: 'STOCK' | 'MANUFACTURE';
   costPrice: number;
   salePrice: number;
   taxRate: number;

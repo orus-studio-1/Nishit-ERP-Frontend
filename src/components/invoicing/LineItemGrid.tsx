@@ -35,14 +35,14 @@ function templateRate(template?: TaxTemplateOption | null) {
   return (template?.lines || []).reduce((sum, line) => sum + Number(line.rate || 0), 0);
 }
 
-export function LineItemGrid({ value, onChange, currency = 'USD', readOnly = false, className }: LineItemGridProps) {
+export function LineItemGrid({ value, onChange, currency = 'INR', readOnly = false, className }: LineItemGridProps) {
   const rows = value.length ? value : [blankRow()];
   const [activeLookup, setActiveLookup] = useState<number | null>(null);
   const [queries, setQueries] = useState<Record<number, string>>({});
   const [options, setOptions] = useState<ProductOption[]>([]);
   const [taxTemplates, setTaxTemplates] = useState<TaxTemplateOption[]>([]);
   const cellRefs = useRef<Record<string, HTMLInputElement | null>>({});
-  const columns = ['product', 'description', 'quantity', 'unitPrice', 'discount', 'taxRate'];
+  const columns = ['product', 'description', 'hsnCode', 'brand', 'quantity', 'unitPrice', 'discount', 'taxRate'];
 
   const summary = useMemo(() => calculateLineSummary(rows), [rows]);
 
@@ -90,6 +90,8 @@ export function LineItemGrid({ value, onChange, currency = 'USD', readOnly = fal
       productId: product.id,
       itemCode: product.sku,
       description: product.name,
+      hsnCode: product.hsnCode || '',
+      brand: product.brand || product.manufacturer || '',
       unitPrice: Number(product.salePrice) || 0,
       taxTemplateId: defaultTemplate?.id || product.defaultTaxTemplateId || '',
       taxTemplateName: defaultTemplate?.name || product.defaultTaxTemplate?.name || '',
@@ -147,6 +149,8 @@ export function LineItemGrid({ value, onChange, currency = 'USD', readOnly = fal
               <th className="w-10 px-3 py-2 text-left">#</th>
               <th className="px-3 py-2 text-left">Item</th>
               <th className="px-3 py-2 text-left">Description</th>
+              <th className="px-3 py-2 text-left">HSN</th>
+              <th className="px-3 py-2 text-left">Brand / Make</th>
               <th className="px-3 py-2 text-right">Qty</th>
               <th className="px-3 py-2 text-right">Unit Price</th>
               <th className="px-3 py-2 text-right">Disc %</th>
@@ -161,6 +165,8 @@ export function LineItemGrid({ value, onChange, currency = 'USD', readOnly = fal
                 <td className="px-3 py-2 text-xs text-[#9aa3af]">{index + 1}</td>
                 <td className="px-3 py-2 font-mono text-xs text-[#1674c4]">{row.itemCode || row.productId || '-'}</td>
                 <td className="px-3 py-2">{row.description || '-'}</td>
+                <td className="px-3 py-2">{row.hsnCode || '-'}</td>
+                <td className="px-3 py-2">{row.brand || '-'}</td>
                 <td className="px-3 py-2 text-right">{row.quantity}</td>
                 <td className="px-3 py-2 text-right">{formatCurrency(row.unitPrice, currency)}</td>
                 <td className="px-3 py-2 text-right">{row.discount}</td>
@@ -179,12 +185,14 @@ export function LineItemGrid({ value, onChange, currency = 'USD', readOnly = fal
   return (
     <div className={cn('overflow-visible rounded-md border border-[#dfe3e8] bg-white', className)}>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1240px] border-separate border-spacing-0 text-sm">
+        <table className="w-full min-w-[1480px] border-separate border-spacing-0 text-sm">
           <thead className="bg-[#f7f8fa] text-xs font-medium text-[#6b7280]">
             <tr>
               <th className="w-10 border-b border-[#dfe3e8] px-2 py-2 text-left">#</th>
               <th className="w-[210px] border-b border-[#dfe3e8] px-2 py-2 text-left">Item</th>
               <th className="border-b border-[#dfe3e8] px-2 py-2 text-left">Description</th>
+              <th className="w-[110px] border-b border-[#dfe3e8] px-2 py-2 text-left">HSN</th>
+              <th className="w-[130px] border-b border-[#dfe3e8] px-2 py-2 text-left">Brand / Make</th>
               <th className="w-[92px] border-b border-[#dfe3e8] px-2 py-2 text-right">Qty</th>
               <th className="w-[120px] border-b border-[#dfe3e8] px-2 py-2 text-right">Rate</th>
               <th className="w-[92px] border-b border-[#dfe3e8] px-2 py-2 text-right">Disc %</th>
@@ -252,6 +260,8 @@ export function LineItemGrid({ value, onChange, currency = 'USD', readOnly = fal
                 <td className="border-b border-[#f0ede8] px-2 py-1.5">
                   <Input className="h-7 border-transparent bg-transparent shadow-none hover:border-[#d9d4cc] focus-visible:bg-white" ref={node => { cellRefs.current[`${index}-description`] = node; }} value={row.description} onKeyDown={event => handleKeyDown(event, index, 'description')} onChange={event => updateRow(index, { description: event.target.value })} />
                 </td>
+                <td className="border-b border-[#f0ede8] px-2 py-1.5"><Input className="h-7 border-transparent bg-transparent shadow-none" ref={node => { cellRefs.current[`${index}-hsnCode`] = node; }} value={row.hsnCode || ''} onKeyDown={event => handleKeyDown(event, index, 'hsnCode')} onChange={event => updateRow(index, { hsnCode: event.target.value })} /></td>
+                <td className="border-b border-[#f0ede8] px-2 py-1.5"><Input className="h-7 border-transparent bg-transparent shadow-none" ref={node => { cellRefs.current[`${index}-brand`] = node; }} value={row.brand || ''} onKeyDown={event => handleKeyDown(event, index, 'brand')} onChange={event => updateRow(index, { brand: event.target.value })} /></td>
                 <td className="border-b border-[#f0ede8] px-2 py-1.5">
                   <Input ref={node => { cellRefs.current[`${index}-quantity`] = node; }} className="h-7 border-transparent bg-transparent text-right shadow-none hover:border-[#d9d4cc] focus-visible:bg-white" type="number" step="0.01" value={row.quantity} onKeyDown={event => handleKeyDown(event, index, 'quantity')} onChange={event => updateRow(index, { quantity: Number(event.target.value) })} />
                 </td>

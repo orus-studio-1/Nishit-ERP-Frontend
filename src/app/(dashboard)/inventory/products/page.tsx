@@ -37,6 +37,7 @@ export default function ProductsPage() {
     categoryId: '',
     unitId: '',
     type: 'PRODUCT',
+    supplyPolicy: 'STOCK',
     costPrice: 0,
     salePrice: 0,
     taxRate: 0,
@@ -127,6 +128,7 @@ export default function ProductsPage() {
         categoryId: '',
         unitId: '',
         type: 'PRODUCT',
+        supplyPolicy: 'STOCK',
         costPrice: 0,
         salePrice: 0,
         taxRate: 0,
@@ -152,12 +154,13 @@ export default function ProductsPage() {
   const getTotalStock = (product: Product) =>
     product.stockLevels?.reduce((sum, sl) => sum + sl.quantity, 0) || 0;
 
-  const openCreate = () => { setEditingProduct(null); setForm({ sku: '', name: '', description: '', categoryId: '', unitId: '', type: 'PRODUCT', costPrice: 0, salePrice: 0, taxRate: 0, minStockLevel: 0, valuationMethod: 'MOVING_AVERAGE', maintainStock: true, allowNegativeStock: false, hasBatchNo: false, hasSerialNo: false, reorderLevel: 0, reorderQty: 0, brand: '', manufacturer: '' }); setShowModal(true); };
+  const openCreate = () => { setEditingProduct(null); setForm({ sku: '', name: '', description: '', categoryId: '', unitId: '', type: 'PRODUCT', supplyPolicy: 'STOCK', costPrice: 0, salePrice: 0, taxRate: 0, minStockLevel: 0, valuationMethod: 'MOVING_AVERAGE', maintainStock: true, allowNegativeStock: false, hasBatchNo: false, hasSerialNo: false, reorderLevel: 0, reorderQty: 0, brand: '', manufacturer: '' }); setShowModal(true); };
   const openEdit = (product: Product) => {
     setEditingProduct(product);
     setForm({
       sku: product.sku || '', name: product.name || '', description: product.description || '',
       categoryId: product.categoryId || '', unitId: product.unitId || '', type: product.type || 'PRODUCT',
+      supplyPolicy: product.supplyPolicy || 'STOCK',
       costPrice: Number(product.costPrice || 0), salePrice: Number(product.salePrice || 0), taxRate: Number(product.taxRate || 0),
       minStockLevel: Number(product.minStockLevel || 0), valuationMethod: product.valuationMethod || 'MOVING_AVERAGE',
       maintainStock: product.maintainStock !== false, allowNegativeStock: !!product.allowNegativeStock,
@@ -409,6 +412,13 @@ export default function ProductsPage() {
                   <SelectItem value="FIFO">FIFO</SelectItem>
                   <SelectItem value="STANDARD">Standard</SelectItem>
                 </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Default supply policy</Label>
+              <Select value={form.supplyPolicy} onValueChange={(v) => setForm((f) => ({ ...f, supplyPolicy: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="STOCK">Buy / fulfil from stock</SelectItem><SelectItem value="MANUFACTURE">Manufacture to order</SelectItem></SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">

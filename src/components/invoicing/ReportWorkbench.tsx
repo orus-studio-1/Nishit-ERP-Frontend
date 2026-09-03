@@ -110,7 +110,7 @@ export function ReportWorkbench({
             {filterConfig.customer && (
               <Select value={filter.customerId} onValueChange={customerId => setFilter(prev => ({ ...prev, customerId }))}>
                 <SelectTrigger><SelectValue placeholder="Customer" /></SelectTrigger>
-                <SelectContent><SelectItem value="ALL">All customers</SelectItem>{customers.map(customer => <SelectItem key={customer.id} value={customer.id}>{customer.name}</SelectItem>)}</SelectContent>
+                <SelectContent searchable searchPlaceholder="Search customers…"><SelectItem value="ALL">All customers</SelectItem>{customers.map(customer => <SelectItem key={customer.id} value={customer.id}>{customer.name}</SelectItem>)}</SelectContent>
               </Select>
             )}
             {filterConfig.dateRange && (

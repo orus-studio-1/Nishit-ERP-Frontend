@@ -41,7 +41,7 @@ export default function SalesOrdersPage() {
     customerId: '',
     date: new Date().toISOString().slice(0, 10),
     deliveryDate: '',
-    currency: 'USD',
+    currency: 'INR',
     notes: '',
     terms: '',
     supplyMode: 'MAKE_TO_STOCK',
@@ -210,7 +210,7 @@ export default function SalesOrdersPage() {
         customerId: '',
         date: new Date().toISOString().slice(0, 10),
         deliveryDate: '',
-        currency: 'USD',
+        currency: 'INR',
         notes: '',
         terms: '',
         supplyMode: 'MAKE_TO_STOCK',
@@ -228,7 +228,7 @@ export default function SalesOrdersPage() {
 
   const openCreate = () => {
     setEditingOrder(null);
-    setForm({ customerId: '', date: new Date().toISOString().slice(0, 10), deliveryDate: '', currency: 'USD', notes: '', terms: '', supplyMode: 'MAKE_TO_STOCK' });
+    setForm({ customerId: '', date: new Date().toISOString().slice(0, 10), deliveryDate: '', currency: 'INR', notes: '', terms: '', supplyMode: 'MAKE_TO_STOCK' });
     setRows([{ productId: '', itemCode: '', description: '', quantity: 1, unitPrice: 0, discount: 0, taxRate: 0, total: 0 }]);
     setNewOpen(true);
   };
@@ -240,7 +240,7 @@ export default function SalesOrdersPage() {
       customerId: source.customerId || '',
       date: String(source.date).slice(0, 10),
       deliveryDate: source.deliveryDate ? String(source.deliveryDate).slice(0, 10) : '',
-      currency: source.currency || 'USD',
+      currency: source.currency || 'INR',
       notes: source.notes || '',
       terms: source.terms || '',
       supplyMode: source.supplyMode || source.items?.[0]?.supplyMode || 'MAKE_TO_STOCK',
@@ -457,7 +457,7 @@ export default function SalesOrdersPage() {
                   <SelectTrigger>
                     <SelectValue placeholder="Select customer" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent searchable searchPlaceholder="Search customers…">
                     {customers.length === 0 ? (
                       <SelectEmptyState
                         message="No customers found"

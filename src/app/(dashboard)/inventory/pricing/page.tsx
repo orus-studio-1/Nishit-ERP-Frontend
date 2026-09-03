@@ -346,7 +346,7 @@ function ProductSelect({
         <SelectTrigger>
           <SelectValue placeholder="Select product" />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent searchable searchPlaceholder="Search products…">
           {products.length === 0 ? (
             <SelectEmptyState
               message="No products found"

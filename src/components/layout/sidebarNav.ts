@@ -98,9 +98,7 @@ export const navItems: NavItem[] = [
   {
     label: 'Sales', icon: ShoppingCart,
     children: [
-      { label: 'Sales Orders', href: '/sales/orders', icon: ShoppingCart, permission: 'sales:sales-orders:read' },
-      { label: 'Quotations', href: '/sales/quotations', icon: FileCheck2, permission: 'sales:quotations:read' },
-      { label: 'Sales Enquiries', href: '/sales/enquiries', icon: ClipboardSignature },
+      { label: 'Sales Cases', href: '/sales/enquiries', icon: ClipboardSignature },
       { label: 'Fulfilment', href: '/sales/fulfilment', icon: PackageCheck },
       { label: 'Sales Reports', href: '/sales/reports', icon: BarChart3 },
       { label: 'Sales Configuration', href: '/sales/settings', icon: Settings },

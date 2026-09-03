@@ -33,7 +33,7 @@ const initialAccountForm = {
   subType: '',
   parentId: '',
   description: '',
-  currency: 'USD',
+  currency: 'INR',
   isGroup: false,
   freezeAccount: false,
   frozenTillDate: '',
@@ -114,7 +114,7 @@ export default function AccountsPage() {
 
   const groupAccounts = accounts.filter((a) => a.isGroup && a.id !== editing?.id);
   const openCreate = () => { setEditing(null); setForm(initialAccountForm); setShowModal(true); };
-  const openEdit = (account: Account) => { const source = account as any; setEditing(account); setForm({ code: account.code || '', name: account.name || '', type: account.type || 'ASSET', subType: account.subType || '', parentId: account.parentId || '', description: account.description || '', currency: account.currency || 'USD', isGroup: !!account.isGroup, freezeAccount: !!source.freezeAccount, frozenTillDate: source.frozenTillDate ? String(source.frozenTillDate).slice(0, 10) : '', isDefaultCash: !!source.isDefaultCash, isDefaultBank: !!source.isDefaultBank, isDefaultReceivable: !!source.isDefaultReceivable, isDefaultPayable: !!source.isDefaultPayable, isDefaultTax: !!source.isDefaultTax, isDefaultRetainedEarnings: !!source.isDefaultRetainedEarnings }); setShowModal(true); };
+  const openEdit = (account: Account) => { const source = account as any; setEditing(account); setForm({ code: account.code || '', name: account.name || '', type: account.type || 'ASSET', subType: account.subType || '', parentId: account.parentId || '', description: account.description || '', currency: account.currency || 'INR', isGroup: !!account.isGroup, freezeAccount: !!source.freezeAccount, frozenTillDate: source.frozenTillDate ? String(source.frozenTillDate).slice(0, 10) : '', isDefaultCash: !!source.isDefaultCash, isDefaultBank: !!source.isDefaultBank, isDefaultReceivable: !!source.isDefaultReceivable, isDefaultPayable: !!source.isDefaultPayable, isDefaultTax: !!source.isDefaultTax, isDefaultRetainedEarnings: !!source.isDefaultRetainedEarnings }); setShowModal(true); };
 
   const columns = [
     { key: 'code', header: 'Code', render: (a: Account) => <span className="font-mono text-sm font-semibold">{a.code}</span> },

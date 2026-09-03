@@ -209,7 +209,7 @@ export default function StockMovementsPage() {
                 <SelectTrigger>
                   <SelectValue placeholder="Select product" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent searchable searchPlaceholder="Search products…">
                   {products.length === 0 ? (
                     <SelectEmptyState
                       message="No products found"
@@ -235,7 +235,7 @@ export default function StockMovementsPage() {
                 <SelectTrigger>
                   <SelectValue placeholder="Select warehouse" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent searchable searchPlaceholder="Search warehouses…">
                   {warehouses.length === 0 ? (
                     <SelectEmptyState
                       message="No warehouses found"
