@@ -32,6 +32,7 @@ import { SelectEmptyState } from '@/components/shared/SelectEmptyState';
 import { CurrencySelect } from '@/components/ui/currency-select';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { showApiError, showApiSuccess } from '@/lib/apiError';
 
@@ -153,7 +154,7 @@ const config: Record<ProcurementKind, { title: string; description: string; endp
 };
 
 const today = () => new Date().toISOString().slice(0, 10);
-const blankLine = { productId: '', quantity: 1, unitPrice: 0, rate: 0, taxRate: 0, discount: 0 };
+const blankLine = { productId: '', quantity: 1, unitPrice: 0, rate: 0, taxRate: 0, discount: 0, categoryCode: '', hsnCode: '', make: '', quantityTolerance: '', deliveryDate: '', uom: '' };
 
 export function ProcurementPage({ kind }: { kind: ProcurementKind }) {
   const meta = config[kind];
@@ -636,6 +637,16 @@ function DocumentFields({ kind, form, setForm, suppliers, products, orders, rece
           </Select>
         </div>
       )}
+      {kind === 'supplier-quotations' && <>
+        {[
+          ['AO Number','aoNo'], ['Accepted Order Number','acceptedOrderNo'], ['Accepted Order Date','acceptedOrderDate'], ['Vendor Order Number','vendorOrderNo'],
+          ['Bill-to Code','billToCode'], ['Bill-to Name','billToName'], ['Bill-to GSTIN','billToGstin'], ['Bill-to PAN','billToPan'],
+          ['Dispatch-to Code','dispatchToCode'], ['Dispatch-to Name','dispatchToName'], ['Dispatch-to GSTIN','dispatchToGstin'], ['Vendor Code','vendorCode'],
+          ['Contact Person','contactPerson'], ['Contact Number','contactNo'], ['Payment Terms','paymentTerms'], ['Documents To','documentsTo'],
+        ].map(([label, key]) => <Field label={label} key={key}><Input value={form.vendorDocumentDetails?.[key] || ''} onChange={(e: any) => setForm({ ...form, vendorDocumentDetails: { ...(form.vendorDocumentDetails || {}), [key]: e.target.value } })} /></Field>)}
+        <div className="space-y-1.5 md:col-span-2"><Label>Bill-to Address</Label><Textarea value={form.vendorDocumentDetails?.billToAddress || ''} onChange={(e: any) => setForm({ ...form, vendorDocumentDetails: { ...(form.vendorDocumentDetails || {}), billToAddress: e.target.value } })} /></div>
+        <div className="space-y-1.5 md:col-span-2"><Label>Dispatch-to Address</Label><Textarea value={form.vendorDocumentDetails?.dispatchToAddress || ''} onChange={(e: any) => setForm({ ...form, vendorDocumentDetails: { ...(form.vendorDocumentDetails || {}), dispatchToAddress: e.target.value } })} /></div>
+      </>}
       {kind === 'payment-terms' && (
         <>
           <Field label="Template Name *">
@@ -1190,7 +1201,7 @@ function LineEditor({ kind, lines, setLines, products, total, currency }: any) {
               <SelectTrigger className="h-8 text-xs">
                 <SelectValue placeholder="Select item" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent searchable searchPlaceholder="Search products…">
                 {products.length === 0 ? (
                   <SelectEmptyState
                     message="No products found"
@@ -1245,6 +1256,9 @@ function LineEditor({ kind, lines, setLines, products, total, currency }: any) {
           >
             ×
           </Button>
+          {kind === 'supplier-quotations' && <div className="col-span-12 grid gap-2 rounded bg-gray-50 p-2 sm:grid-cols-6">
+            {[['Category / CAT','categoryCode'],['HSN Code','hsnCode'],['Make / Brand','make'],['Qty tolerance','quantityTolerance'],['Delivery date','deliveryDate'],['UOM','uom']].map(([placeholder, key]) => <Input key={key} type={key === 'deliveryDate' ? 'date' : 'text'} className="h-8" placeholder={placeholder} value={line[key] || ''} onChange={(e) => updateLine(lines, setLines, index, { [key]: e.target.value })} />)}
+          </div>}
         </div>
       ))}
       <div className="text-right text-sm font-semibold text-gray-900">
@@ -1340,6 +1354,7 @@ function defaultForm(kind: ProcurementKind) {
   const base: any = { date: today(), currency: 'INR', exchangeRate: 1 };
   if (kind === 'material-requests') return { requiredBy: today(), source: 'MANUAL' };
   if (kind === 'rfqs') return { validUntil: today() };
+  if (kind === 'supplier-quotations') return { ...base, vendorDocumentDetails: {} };
   if (kind === 'blanket-purchase-orders') return { validFrom: today(), validTo: today(), currency: 'INR' };
   if (kind === 'purchase-receipts') return { postingDate: today() };
   if (kind === 'supplier-payments')
@@ -1393,7 +1408,7 @@ function columnsFor(kind: ProcurementKind, status: (id: string, value: string) =
     ];
   if (kind === 'rfqs')
     return [
-      { key: 'rfqNo', header: 'RFQ #' },
+      { key: 'rfqNo', header: 'Procurement Case', render: (r: any) => <Link href={`/procurement/rfqs/${r.id}`} className="font-mono font-semibold text-blue-600 hover:underline">{r.rfqNo}</Link> },
       { key: 'status', header: 'Status', render: (r: any) => <StatusBadge status={r.status} /> },
       { key: 'validUntil', header: 'Valid Until', render: (r: any) => (r.validUntil ? formatDate(r.validUntil) : '-') },
       { key: 'suppliers', header: 'Suppliers', render: (r: any) => r.suppliers?.length || 0 },
@@ -1412,7 +1427,7 @@ function columnsFor(kind: ProcurementKind, status: (id: string, value: string) =
       {
         key: 'orderNo',
         header: 'PO #',
-        render: (r: any) => <span className="font-mono text-xs font-semibold text-[#1674c4]">{r.orderNo}</span>,
+        render: (r: any) => <Link href={`/procurement/purchase-orders/${r.id}`} className="font-mono text-xs font-semibold text-[#1674c4] hover:underline">{r.orderNo}</Link>,
       },
       { key: 'supplier', header: 'Supplier', render: (r: any) => r.supplier?.name },
       { key: 'status', header: 'Status', render: (r: any) => <StatusBadge status={r.status} /> },
@@ -1524,11 +1539,12 @@ function Actions({ kind, row, status, operate, rfqOperation }: any) {
       </Button>
     );
   if (kind === 'purchase-orders') return <div className="flex flex-wrap justify-end gap-1">
+    <Button size="sm" variant="outline" asChild><Link href={`/procurement/purchase-orders/${row.id}`} onClick={(e) => e.stopPropagation()}>Open workspace</Link></Button>
     {row.status === 'DRAFT' && !row.submittedAt && <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); operate(row, 'submit'); }}>Submit</Button>}
     {row.status === 'DRAFT' && row.approvalInstanceId && <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); operate(row, 'approve'); }}>Finalize Approval</Button>}
     {row.status === 'CONFIRMED' && !row.sentAt && <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); operate(row, 'send'); }}>Email Vendor</Button>}
     {['SENT', 'CONFIRMED', 'RECEIVING'].includes(row.status) && <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); operate(row, 'dispatch'); }}>Record GIT</Button>}
-    {['SENT', 'CONFIRMED', 'RECEIVING'].includes(row.status) && <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); operate(row, 'receive-goods'); }}>Receive / GRN</Button>}
+    {['SENT', 'CONFIRMED', 'RECEIVING'].includes(row.status) && <Button size="sm" variant="outline" asChild><Link href={`/procurement/purchase-orders/${row.id}`} onClick={(e) => e.stopPropagation()}>Receive partial</Link></Button>}
     {['SENT', 'CONFIRMED', 'RECEIVING'].includes(row.status) && <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); operate(row, 'delay-follow-up'); }}>Delay Follow-up</Button>}
   </div>;
   if (kind === 'purchase-invoices' && row.status === 'DRAFT')

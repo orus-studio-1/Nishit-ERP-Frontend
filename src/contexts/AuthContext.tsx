@@ -10,7 +10,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string, code?: string, challenge?: string) => Promise<{ requiresTwoFactor?: boolean; challenge?: string }>;
   register: (data: RegisterData) => Promise<AuthResponse>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 interface RegisterData {
@@ -144,18 +144,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return res.data.data;
   };
 
-  const logout = () => {
-    api.post('/auth/logout').catch(() => null);
-    setAccessToken(null);
-    setUser(null);
-    setToken(null);
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-      } catch {}
+  const logout = async () => {
+    // The refresh cookie is HttpOnly, so the server must clear it before we
+    // navigate away. A fire-and-forget request can be cancelled by navigation
+    // and causes the session to be restored immediately on the login page.
+    try {
+      await api.post('/auth/logout');
+    } catch {
+      // Local sign-out must still complete when the session already expired or
+      // the API is temporarily unavailable.
+    } finally {
+      setAccessToken(null);
+      setUser(null);
+      setToken(null);
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          sessionStorage.clear();
+        } catch {}
+        window.location.replace('/login');
+      }
     }
-    window.location.href = '/login';
   };
 
   return (

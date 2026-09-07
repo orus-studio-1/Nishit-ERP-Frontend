@@ -57,7 +57,7 @@ api.interceptors.response.use(
   (res) => res,
   async (err) => {
     const requestUrl = String(err.config?.url || '');
-    const isAuthRequest = ['/auth/login', '/auth/register', '/auth/refresh']
+    const isAuthRequest = ['/auth/login', '/auth/register', '/auth/refresh', '/auth/logout']
       .some((path) => requestUrl.includes(path));
 
     if (err.response?.status === 401 && !isAuthRequest) {
