@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, ArrowLeft, ArrowUpRight, Save } from 'lucide-react';
+import { AlertCircle, ArrowLeft, ArrowUpRight, Loader2, Save } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,6 +27,8 @@ export default function NewSalesInvoicePage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [sourceOrder, setSourceOrder] = useState<any>(null);
+  const [isLoadingOrder, setIsLoadingOrder] = useState(false);
   const [form, setForm] = useState({
     customerId: '',
     date: new Date().toISOString().slice(0, 10),
@@ -45,6 +47,35 @@ export default function NewSalesInvoicePage() {
       .then((res) => setCustomers(res.data?.data?.items || res.data?.data || []))
       .catch((err) => showApiError(err, 'Failed to load customers'))
       .finally(() => setIsLoadingCustomers(false));
+  }, []);
+
+  useEffect(() => {
+    const salesOrderId = new URLSearchParams(window.location.search).get('salesOrderId');
+    if (!salesOrderId) return;
+    setIsLoadingOrder(true);
+    api.get(`/sales/orders/${salesOrderId}`)
+      .then((res) => {
+        const order = res.data?.data;
+        if (!order) throw new Error('Sales order was not found');
+        const remainingRows = (order.items || []).map((item: any) => ({
+          id: item.id,
+          productId: item.productId,
+          itemCode: item.product?.sku || item.itemCode || '',
+          description: item.description || item.product?.name || '',
+          hsnCode: item.hsnCode || item.product?.hsnCode || '',
+          brand: item.brand || item.product?.brand || item.product?.manufacturer || '',
+          quantity: Math.max(0, Number(item.quantity) - Number(item.billedQty || 0)),
+          unitPrice: Number(item.unitPrice || 0),
+          discount: Number(item.discount || 0),
+          taxRate: Number(item.taxRate || 0),
+          total: 0,
+        })).filter((item: LineItemRow) => item.quantity > 0);
+        setSourceOrder(order);
+        setForm((current) => ({ ...current, customerId: order.customerId, currency: order.currency || 'INR', terms: order.terms || '', notes: order.notes || '', dueDate: order.deliveryDate ? String(order.deliveryDate).slice(0, 10) : '' }));
+        setRows(remainingRows);
+      })
+      .catch((err) => showApiError(err, 'Failed to load the source sales order'))
+      .finally(() => setIsLoadingOrder(false));
   }, []);
 
   const createInvoice = async () => {
@@ -85,7 +116,11 @@ export default function NewSalesInvoicePage() {
 
     setIsSaving(true);
     try {
-      const res = await api.post('/invoices', { ...form, items });
+      const res = sourceOrder
+        ? await api.post(`/invoices/from-sales-order/${sourceOrder.id}`, {
+            items: rows.filter((row) => row.id && Number(row.quantity) > 0).map((row) => ({ salesOrderItemId: row.id, quantity: Number(row.quantity) })),
+          })
+        : await api.post('/invoices', { ...form, items });
       const invoice = res.data?.data;
       showApiSuccess('Draft invoice created successfully');
       router.push(`/invoicing/sales-invoices/${invoice.id}`);
@@ -107,11 +142,11 @@ export default function NewSalesInvoicePage() {
             </Link>
           </Button>
           <h1 className="text-xl font-semibold text-[#1f2937]">New Sales Invoice</h1>
-          <p className="text-sm text-[#6b7280]">Create a draft invoice. Totals are confirmed by the backend after save.</p>
+          <p className="text-sm text-[#6b7280]">{sourceOrder ? `Create a linked invoice for ${sourceOrder.orderNo}. Quantities cannot exceed the unbilled balance.` : 'Create a draft invoice. Totals are confirmed by the backend after save.'}</p>
         </div>
-        <Button onClick={createInvoice} disabled={isSaving || customers.length === 0}>
-          <Save className="mr-2 h-4 w-4" />
-          {isSaving ? 'Creating Draft...' : 'Create Draft'}
+        <Button onClick={createInvoice} disabled={isSaving || isLoadingOrder || customers.length === 0}>
+          {isLoadingOrder ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+          {isLoadingOrder ? 'Loading Order...' : isSaving ? 'Creating Draft...' : 'Create Draft'}
         </Button>
       </div>
 
@@ -140,6 +175,7 @@ export default function NewSalesInvoicePage() {
               <Label>Customer *</Label>
               <Select
                 value={form.customerId}
+                disabled={Boolean(sourceOrder)}
                 onValueChange={(value) => {
                   const customer = customers.find((c) => c.id === value);
                   setForm((prev) => ({

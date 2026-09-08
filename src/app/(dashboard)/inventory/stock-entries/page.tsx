@@ -28,6 +28,8 @@ const purposes = [
   'STOCK_RECONCILIATION',
 ];
 
+const emptyStockRow = () => ({ productId: '', warehouseId: '', quantity: 1, valuationRate: 0, batchId: '', batchNo: '', serialNoId: '', serialNo: '' });
+
 export default function StockEntriesPage() {
   const [entries, setEntries] = useState<StockEntry[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -44,7 +46,13 @@ export default function StockEntriesPage() {
     toWarehouseId: '',
     remarks: '',
   });
-  const [rows, setRows] = useState([{ productId: '', warehouseId: '', quantity: 1, valuationRate: 0, batchId: '', batchNo: '', serialNoId: '', serialNo: '' }]);
+  const [rows, setRows] = useState([emptyStockRow()]);
+
+  const openCreate = () => {
+    setForm({ purpose: 'MATERIAL_RECEIPT', postingDate: new Date().toISOString().slice(0, 10), fromWarehouseId: '', toWarehouseId: '', remarks: '' });
+    setRows([emptyStockRow()]);
+    setOpen(true);
+  };
 
   const load = async () => {
     setIsLoading(true);
@@ -85,7 +93,7 @@ export default function StockEntriesPage() {
       await api.post('/inventory/stock-entries', { ...form, items });
       showApiSuccess('Stock entry created successfully');
       setOpen(false);
-      setRows([{ productId: '', warehouseId: '', quantity: 1, valuationRate: 0, batchId: '', batchNo: '', serialNoId: '', serialNo: '' }]);
+      setRows([emptyStockRow()]);
       load();
     } catch (err: any) {
       showApiError(err, 'Could not create stock entry');
@@ -109,7 +117,7 @@ export default function StockEntriesPage() {
       <PageHeader
         title="Stock Entries"
         description="Submit auditable inventory receipts, issues, transfers, and opening balances"
-        action={{ label: 'New Stock Entry', onClick: () => setOpen(true), icon: Plus }}
+        action={{ label: 'New Stock Entry', onClick: openCreate, icon: Plus }}
       />
       <DataTable
         data={entries}
@@ -380,7 +388,7 @@ export default function StockEntriesPage() {
               <Button
                 variant="outline"
                 onClick={() =>
-                  setRows((prev) => [...prev, { productId: '', warehouseId: '', quantity: 1, valuationRate: 0, batchId: '', batchNo: '', serialNoId: '', serialNo: '' }])
+                  setRows((prev) => [...prev, emptyStockRow()])
                 }
               >
                 Add Row
