@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { Plus, Truck, Pencil } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
@@ -110,7 +111,7 @@ export default function SuppliersPage() {
     {
       key: 'name',
       header: 'Name',
-      render: (s: Supplier) => <span className="font-medium text-gray-900">{s.name}</span>,
+      render: (s: Supplier) => <Link href={`/suppliers/${s.id}`} className="font-medium text-blue-600 hover:underline">{s.name}</Link>,
     },
     { key: 'email', header: 'Email', render: (s: Supplier) => s.email || '—' },
     { key: 'phone', header: 'Phone', render: (s: Supplier) => s.phone || '—' },
@@ -121,7 +122,7 @@ export default function SuppliersPage() {
       header: 'Payment Terms',
       render: (s: Supplier) => `${s.paymentTerms} days`,
     },
-    { key: 'actions', header: '', render: (s: Supplier) => <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); openEdit(s); }}><Pencil className="mr-1 h-3.5 w-3.5" />Edit</Button> },
+    { key: 'actions', header: '', render: (s: Supplier) => <div className="flex justify-end gap-2"><Button size="sm" variant="outline" asChild><Link href={`/suppliers/${s.id}`} onClick={(event) => event.stopPropagation()}>Communications</Link></Button><Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); openEdit(s); }}><Pencil className="mr-1 h-3.5 w-3.5" />Edit</Button></div> },
   ];
 
   return (

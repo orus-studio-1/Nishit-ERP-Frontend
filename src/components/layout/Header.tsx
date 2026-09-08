@@ -33,7 +33,19 @@ export function Header({ onMenuClick }: HeaderProps) {
     }
   };
 
-  useEffect(() => { void loadNotifications(); }, []);
+  useEffect(() => {
+    void loadNotifications();
+    const timer = window.setInterval(() => void loadNotifications(), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const openNotification = async (item: Notification) => {
+    if (!item.isRead) {
+      await api.patch(`/notifications/${item.id}/read`).catch(() => null);
+      setUnreadCount((count) => Math.max(0, count - 1));
+    }
+    window.location.assign(item.link || '#');
+  };
 
   const toggleNotifications = () => {
     const opening = !notificationsOpen;
@@ -81,10 +93,10 @@ export function Header({ onMenuClick }: HeaderProps) {
               ) : (
                 <div className="mt-2 max-h-80 space-y-1 overflow-y-auto">
                   {notifications.map((item) => (
-                    <a key={item.id} href={item.link || '#'} className={`block rounded p-2 text-sm hover:bg-[#f8faf9] ${item.isRead ? 'text-[#7c8591]' : 'bg-[#eef6ff] text-[#1f2937]'}`}>
+                    <button type="button" key={item.id} onClick={() => void openNotification(item)} className={`block w-full rounded p-2 text-left text-sm hover:bg-[#f8faf9] ${item.isRead ? 'text-[#7c8591]' : 'bg-[#eef6ff] text-[#1f2937]'}`}>
                       <span className="block font-medium">{item.title}</span>
                       <span className="block text-xs">{item.message}</span>
-                    </a>
+                    </button>
                   ))}
                 </div>
               )}

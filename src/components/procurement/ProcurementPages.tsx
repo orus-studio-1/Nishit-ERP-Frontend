@@ -1177,16 +1177,17 @@ function PaymentTermEditor({ lines, setLines }: any) {
 
 function LineEditor({ kind, lines, setLines, products, total, currency }: any) {
   return (
-    <div className="space-y-2 rounded-md border border-[#e5e2dc] bg-white p-3">
+    <div className="space-y-3 rounded-md border border-[#e5e2dc] bg-white p-3">
       <div className="flex items-center justify-between">
-        <Label>Items</Label>
+        <div><Label>Items</Label><p className="mt-0.5 text-xs text-gray-500">Select a product and enter its commercial details.</p></div>
         <Button type="button" variant="outline" size="sm" onClick={() => setLines([...lines, blankLine])}>
           Add Row
         </Button>
       </div>
       {lines.map((line: any, index: number) => (
-        <div key={index} className="grid grid-cols-12 gap-2">
-          <div className="col-span-5">
+        <div key={index} className="grid grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-gray-50/50 p-3 md:grid-cols-12 md:items-end">
+          <div className="space-y-1 md:col-span-4">
+            <Label className="text-xs">Product / Item *</Label>
             <Select
               value={line.productId}
               onValueChange={(v) => {
@@ -1198,8 +1199,8 @@ function LineEditor({ kind, lines, setLines, products, total, currency }: any) {
                 });
               }}
             >
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue placeholder="Select item" />
+              <SelectTrigger className="h-9 bg-white text-xs">
+                <SelectValue placeholder="Search and select item" />
               </SelectTrigger>
               <SelectContent searchable searchPlaceholder="Search products…">
                 {products.length === 0 ? (
@@ -1218,51 +1219,34 @@ function LineEditor({ kind, lines, setLines, products, total, currency }: any) {
               </SelectContent>
             </Select>
           </div>
-          <Input
-            className="col-span-2 h-8"
-            type="number"
-            placeholder="Qty"
-            value={line.quantity}
-            onChange={(e) => updateLine(lines, setLines, index, { quantity: Number(e.target.value) })}
-          />
-          <Input
-            className="col-span-2 h-8"
-            type="number"
-            placeholder="Rate"
-            value={line.unitPrice || line.rate || 0}
-            onChange={(e) =>
-              updateLine(lines, setLines, index, {
-                unitPrice: Number(e.target.value),
-                rate: Number(e.target.value),
-              })
-            }
-          />
-          <Input
-            className="col-span-1 h-8"
-            type="number"
-            placeholder="Tax %"
-            value={line.taxRate || 0}
-            onChange={(e) => updateLine(lines, setLines, index, { taxRate: Number(e.target.value) })}
-          />
-          <div className="col-span-1 py-1.5 text-right text-xs font-medium text-gray-700">
-            {formatCurrency(Number(line.quantity || 0) * Number(line.unitPrice || line.rate || 0), currency)}
+          <div className="space-y-1 md:col-span-2"><Label className="text-xs">Quantity *</Label><Input aria-label="Quantity" className="h-9 bg-white" type="number" min="0" step="any" placeholder="0" value={line.quantity} onChange={(e) => updateLine(lines, setLines, index, { quantity: Number(e.target.value) })} /></div>
+          <div className="space-y-1 md:col-span-2"><Label className="text-xs">Rate ({currency || 'INR'}) *</Label><Input aria-label={`Rate in ${currency || 'INR'}`} className="h-9 bg-white" type="number" min="0" step="any" placeholder="0.00" value={line.unitPrice || line.rate || 0} onChange={(e) => updateLine(lines, setLines, index, { unitPrice: Number(e.target.value), rate: Number(e.target.value) })} /></div>
+          <div className="space-y-1 md:col-span-1"><Label className="text-xs">Discount %</Label><Input aria-label="Discount percentage" className="h-9 bg-white" type="number" min="0" max="100" step="any" placeholder="0" value={line.discount || 0} onChange={(e) => updateLine(lines, setLines, index, { discount: Number(e.target.value) })} /></div>
+          <div className="space-y-1 md:col-span-1"><Label className="text-xs">Tax %</Label><Input aria-label="Tax percentage" className="h-9 bg-white" type="number" min="0" step="any" placeholder="0" value={line.taxRate || 0} onChange={(e) => updateLine(lines, setLines, index, { taxRate: Number(e.target.value) })} /></div>
+          <div className="space-y-1 md:col-span-1">
+            <Label className="text-xs">Line amount</Label>
+            <div className="flex h-9 items-center justify-end rounded-md border bg-white px-2 text-xs font-semibold text-gray-800" title="Quantity × rate before document-level charges">
+              {formatCurrency(Number(line.quantity || 0) * Number(line.unitPrice || line.rate || 0) * (1 - Number(line.discount || 0) / 100) * (1 + Number(line.taxRate || 0) / 100), currency)}
+            </div>
           </div>
           <Button
             type="button"
             variant="ghost"
             size="sm"
-            className="col-span-1"
+            aria-label={`Remove item row ${index + 1}`}
+            title="Remove item"
+            className="h-9 text-red-600 hover:bg-red-50 hover:text-red-700 md:col-span-1"
             onClick={() => setLines(lines.filter((_: any, i: number) => i !== index))}
           >
-            ×
+            Remove
           </Button>
-          {kind === 'supplier-quotations' && <div className="col-span-12 grid gap-2 rounded bg-gray-50 p-2 sm:grid-cols-6">
-            {[['Category / CAT','categoryCode'],['HSN Code','hsnCode'],['Make / Brand','make'],['Qty tolerance','quantityTolerance'],['Delivery date','deliveryDate'],['UOM','uom']].map(([placeholder, key]) => <Input key={key} type={key === 'deliveryDate' ? 'date' : 'text'} className="h-8" placeholder={placeholder} value={line[key] || ''} onChange={(e) => updateLine(lines, setLines, index, { [key]: e.target.value })} />)}
+          {kind === 'supplier-quotations' && <div className="grid gap-3 border-t pt-3 md:col-span-12 sm:grid-cols-2 lg:grid-cols-6">
+            {[['Category / CAT','categoryCode'],['HSN Code','hsnCode'],['Make / Brand','make'],['Quantity tolerance','quantityTolerance'],['Delivery date','deliveryDate'],['UOM','uom']].map(([label, key]) => <div className="space-y-1" key={key}><Label className="text-xs">{label}</Label><Input aria-label={label} type={key === 'deliveryDate' ? 'date' : 'text'} className="h-9 bg-white" placeholder={key === 'quantityTolerance' ? 'e.g. ±5%' : `Enter ${label.toLowerCase()}`} value={line[key] || ''} onChange={(e) => updateLine(lines, setLines, index, { [key]: e.target.value })} /></div>)}
           </div>}
         </div>
       ))}
-      <div className="text-right text-sm font-semibold text-gray-900">
-        Preview subtotal: {formatCurrency(total, currency)}
+      <div className="flex justify-end border-t pt-3 text-sm font-semibold text-gray-900">
+        <span className="rounded-md bg-gray-100 px-3 py-2">Preview subtotal: {formatCurrency(total, currency)}</span>
       </div>
       {kind === 'purchase-receipts' && (
         <p className="text-xs text-[#7c8591]">
