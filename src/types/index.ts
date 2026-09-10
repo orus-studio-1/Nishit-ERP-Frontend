@@ -268,7 +268,33 @@ export interface StockMovement {
   unitCost?: number;
   reference?: string;
   notes?: string;
+  batchId?: string;
+  batchNo?: string;
+  serialNoId?: string;
+  serialNo?: string;
   createdAt: string;
+}
+
+export interface Batch {
+  id: string;
+  batchNo: string;
+  productId: string;
+  product?: { name: string };
+  warehouseId?: string;
+  expiryDate?: string;
+  quantity: number;
+  isActive: boolean;
+}
+
+export type SerialNumberStatus = 'AVAILABLE' | 'DELIVERED' | 'RESERVED' | 'SCRAPPED';
+
+export interface SerialNumberRecord {
+  id: string;
+  serialNo: string;
+  productId: string;
+  warehouseId?: string;
+  status: SerialNumberStatus;
+  batchId?: string;
 }
 
 // HR
