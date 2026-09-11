@@ -141,7 +141,13 @@ export default function StockMovementsPage() {
       }
       // Include serial info
       if (selectedProduct?.hasSerialNo && form.serialNo.trim()) {
-        payload.serialNo = form.serialNo.trim();
+        const serialStr = form.serialNo.trim();
+        const existingSerial = serialNumbers.find((s) => s.serialNo === serialStr);
+        if (existingSerial) {
+          payload.serialNoId = existingSerial.id;
+        } else {
+          payload.serialNo = serialStr;
+        }
       }
       await api.post('/inventory/stock-movements', payload);
       showApiSuccess('Stock movement recorded successfully');
