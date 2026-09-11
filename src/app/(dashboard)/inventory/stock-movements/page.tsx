@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AlertCircle, ArrowUpDown, ArrowUpRight, Plus } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { EmptyState } from '@/components/shared/EmptyState';
 import { Textarea } from '@/components/ui/textarea';
 import api from '@/lib/api';
-import { StockMovement, Product, Warehouse, Batch, SerialNumberRecord } from '@/types';
+import { StockMovement, Product, Warehouse } from '@/types';
 import { formatDate } from '@/lib/utils';
 import { showApiError, showApiSuccess } from '@/lib/apiError';
 import toast from 'react-hot-toast';
@@ -33,9 +33,6 @@ export default function StockMovementsPage() {
   const [typeFilter, setTypeFilter] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [batches, setBatches] = useState<Batch[]>([]);
-  const [serialNumbers, setSerialNumbers] = useState<SerialNumberRecord[]>([]);
-  const [batchMode, setBatchMode] = useState<'select' | 'new'>('select');
   const [form, setForm] = useState({
     productId: '',
     warehouseId: '',
@@ -43,42 +40,9 @@ export default function StockMovementsPage() {
     quantity: '',
     notes: '',
     reference: '',
-    batchId: '',
     batchNo: '',
     serialNo: '',
   });
-
-  const selectedProduct = useMemo(
-    () => products.find((p) => p.id === form.productId),
-    [products, form.productId]
-  );
-
-  // Fetch batches & serial numbers when product or warehouse changes
-  useEffect(() => {
-    if (!form.productId) {
-      setBatches([]);
-      setSerialNumbers([]);
-      return;
-    }
-    const product = products.find((p) => p.id === form.productId);
-    if (product?.hasBatchNo && form.warehouseId) {
-      api.get('/inventory/batches', { params: { productId: form.productId, warehouseId: form.warehouseId, limit: 200 } })
-        .then((r) => setBatches(r.data?.data?.items || r.data?.data || []))
-        .catch(() => setBatches([]));
-    } else {
-      setBatches([]);
-    }
-    if (product?.hasSerialNo && form.warehouseId) {
-      api.get('/inventory/serial-numbers', { params: { productId: form.productId, warehouseId: form.warehouseId, status: 'AVAILABLE', limit: 200 } })
-        .then((r) => setSerialNumbers(r.data?.data?.items || r.data?.data || []))
-        .catch(() => setSerialNumbers([]));
-    } else {
-      setSerialNumbers([]);
-    }
-    // Reset batch/serial selections when product changes
-    setForm((f) => ({ ...f, batchId: '', batchNo: '', serialNo: '' }));
-    setBatchMode('select');
-  }, [form.productId, form.warehouseId, products]);
   const limit = 20;
 
   const fetchAll = async () => {
@@ -123,6 +87,7 @@ export default function StockMovementsPage() {
 
     setIsSubmitting(true);
     try {
+      const selectedProduct = products.find((p) => p.id === form.productId);
       const payload: Record<string, any> = {
         productId: form.productId,
         warehouseId: form.warehouseId,
@@ -131,29 +96,16 @@ export default function StockMovementsPage() {
         notes: form.notes || undefined,
         reference: form.reference || undefined,
       };
-      // Include batch info
-      if (selectedProduct?.hasBatchNo) {
-        if (batchMode === 'select' && form.batchId) {
-          payload.batchId = form.batchId;
-        } else if (batchMode === 'new' && form.batchNo.trim()) {
-          payload.batchNo = form.batchNo.trim();
-        }
+      if (selectedProduct?.hasBatchNo && form.batchNo.trim()) {
+        payload.batchNo = form.batchNo.trim();
       }
-      // Include serial info
       if (selectedProduct?.hasSerialNo && form.serialNo.trim()) {
-        const serialStr = form.serialNo.trim();
-        const existingSerial = serialNumbers.find((s) => s.serialNo === serialStr);
-        if (existingSerial) {
-          payload.serialNoId = existingSerial.id;
-        } else {
-          payload.serialNo = serialStr;
-        }
+        payload.serialNo = form.serialNo.trim();
       }
       await api.post('/inventory/stock-movements', payload);
       showApiSuccess('Stock movement recorded successfully');
       setShowModal(false);
-      setForm({ productId: '', warehouseId: '', type: 'IN', quantity: '', notes: '', reference: '', batchId: '', batchNo: '', serialNo: '' });
-      setBatchMode('select');
+      setForm({ productId: '', warehouseId: '', type: 'IN', quantity: '', notes: '', reference: '', batchNo: '', serialNo: '' });
       fetchAll();
     } catch (err: any) {
       showApiError(err, 'Failed to record stock movement');
@@ -318,86 +270,27 @@ export default function StockMovementsPage() {
               </Select>
             </div>
 
-            {/* Batch field — shown when selected product has hasBatchNo */}
-            {selectedProduct?.hasBatchNo && (
+            {/* Batch Number — shown when selected product has hasBatchNo */}
+            {products.find((p) => p.id === form.productId)?.hasBatchNo && (
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <Label>Batch {form.type === 'IN' ? '' : '*'}</Label>
-                  <button
-                    type="button"
-                    className="text-xs text-blue-600 hover:underline"
-                    onClick={() => {
-                      setBatchMode((m) => (m === 'select' ? 'new' : 'select'));
-                      setForm((f) => ({ ...f, batchId: '', batchNo: '' }));
-                    }}
-                  >
-                    {batchMode === 'select' ? '+ New batch' : 'Select existing'}
-                  </button>
-                </div>
-                {batchMode === 'select' ? (
-                  <Select
-                    value={form.batchId}
-                    onValueChange={(v) => setForm((f) => ({ ...f, batchId: v, batchNo: '' }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select batch" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {batches.length === 0 ? (
-                        <div className="px-3 py-2 text-sm text-gray-500">
-                          No batches found for this product/warehouse.
-                          <button
-                            type="button"
-                            className="ml-1 text-blue-600 hover:underline"
-                            onClick={() => {
-                              setBatchMode('new');
-                              setForm((f) => ({ ...f, batchId: '' }));
-                            }}
-                          >
-                            Create new
-                          </button>
-                        </div>
-                      ) : (
-                        batches.map((b) => (
-                          <SelectItem key={b.id} value={b.id}>
-                            {b.batchNo}{b.expiryDate ? ` · Exp ${new Date(b.expiryDate).toLocaleDateString()}` : ''} (Qty: {Number(b.quantity)})
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <Input
-                    value={form.batchNo}
-                    onChange={(e) => setForm((f) => ({ ...f, batchNo: e.target.value, batchId: '' }))}
-                    placeholder="Enter new batch number (e.g. BATCH-2026-001)"
-                  />
-                )}
+                <Label>Batch Number</Label>
+                <Input
+                  value={form.batchNo}
+                  onChange={(e) => setForm((f) => ({ ...f, batchNo: e.target.value }))}
+                  placeholder="e.g. BATCH-2026-001"
+                />
               </div>
             )}
 
-            {/* Serial Number field — shown when selected product has hasSerialNo */}
-            {selectedProduct?.hasSerialNo && (
+            {/* Serial Number — shown when selected product has hasSerialNo */}
+            {products.find((p) => p.id === form.productId)?.hasSerialNo && (
               <div className="space-y-1.5">
-                <Label>Serial Number {form.type === 'IN' ? '' : '*'}</Label>
+                <Label>Serial Number</Label>
                 <Input
                   value={form.serialNo}
                   onChange={(e) => setForm((f) => ({ ...f, serialNo: e.target.value }))}
                   placeholder="Enter serial number"
-                  list="available-serials"
                 />
-                {serialNumbers.length > 0 && (
-                  <datalist id="available-serials">
-                    {serialNumbers.map((s) => (
-                      <option key={s.id} value={s.serialNo} />
-                    ))}
-                  </datalist>
-                )}
-                {form.type !== 'IN' && serialNumbers.length > 0 && (
-                  <p className="text-xs text-gray-500">
-                    {serialNumbers.length} serial(s) available. Type to search.
-                  </p>
-                )}
               </div>
             )}
 
