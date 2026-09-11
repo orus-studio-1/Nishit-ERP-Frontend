@@ -40,6 +40,8 @@ export default function StockMovementsPage() {
     quantity: '',
     notes: '',
     reference: '',
+    batchNumber: '',
+    serialNumber: ''
   });
   const limit = 20;
 
@@ -88,7 +90,7 @@ export default function StockMovementsPage() {
       await api.post('/inventory/stock-movements', { ...form, quantity: Number(form.quantity) });
       showApiSuccess('Stock movement recorded successfully');
       setShowModal(false);
-      setForm({ productId: '', warehouseId: '', type: 'IN', quantity: '', notes: '', reference: '' });
+      setForm({ productId: '', warehouseId: '', type: 'IN', quantity: '', notes: '', reference: '' , batchNumber : '',serialNumber : '' });
       fetchAll();
     } catch (err: any) {
       showApiError(err, 'Failed to record stock movement');
@@ -280,6 +282,26 @@ export default function StockMovementsPage() {
                 />
               </div>
             </div>
+            {form.type === 'IN' && (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Batch Number</Label>
+                  <Input
+                    value={form.batchNumber}
+                    onChange={(e) => setForm((f) => ({ ...f, batchNumber: e.target.value }))}
+                    placeholder="BATCH-LAP-01"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Serial Number</Label>
+                  <Input
+                    value={form.serialNumber}
+                    onChange={(e) => setForm((f) => ({ ...f, serialNumber: e.target.value }))}
+                    placeholder="SERIAL-LAP-01..."
+                  />
+                </div>
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label>Reference</Label>
               <Input
