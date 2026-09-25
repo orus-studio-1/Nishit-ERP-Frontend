@@ -52,6 +52,12 @@ const statusConfig: Record<string, { label: string; className: string }> = {
   DONE: { label: 'Done', className: 'bg-green-100 text-green-700 border-green-200' },
   // Journal entry statuses
   POSTED: { label: 'Posted', className: 'bg-green-100 text-green-700 border-green-200' },
+  // Incentive schemes / calculation runs / contributions
+  CLOSED: { label: 'Closed', className: 'bg-slate-100 text-slate-700 border-slate-200' },
+  RUNNING: { label: 'Running', className: 'bg-blue-100 text-blue-700 border-blue-200' },
+  FAILED: { label: 'Failed', className: 'bg-red-100 text-red-700 border-red-200' },
+  SUPERSEDED: { label: 'Superseded', className: 'bg-gray-100 text-gray-500 border-gray-200' },
+  REVERSED: { label: 'Reversed', className: 'bg-amber-100 text-amber-700 border-amber-200' },
   // Priority
   LOW: { label: 'Low', className: 'bg-gray-100 text-gray-600 border-gray-200' },
   MEDIUM: { label: 'Medium', className: 'bg-blue-100 text-blue-700 border-blue-200' },

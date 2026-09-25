@@ -415,10 +415,10 @@ export function ProcurementPage({ kind }: { kind: ProcurementKind }) {
       </Dialog>
       <Dialog open={!!poOperation} onOpenChange={(value) => !value && setPoOperation(null)}>
         <DialogContent className="max-w-2xl"><DialogHeader><DialogTitle>{poOperation?.operation === 'dispatch' ? 'Record Goods in Transit' : poOperation?.operation === 'receive-goods' ? 'Gate Entry and Goods Receipt' : 'Supplier Delay Follow-up'}</DialogTitle></DialogHeader>{poOperation && <div className="space-y-4"><div className="rounded-lg border bg-gray-50 p-3 text-sm"><span className="font-mono font-semibold">{poOperation.row.poNo}</span><span className="text-gray-500"> · {poOperation.row.supplier?.name}</span></div>
-        {poOperation.operation === 'receive-goods' && <><div className="space-y-1.5"><Label>Receiving warehouse *</Label><Select value={poOperationForm.warehouseId || ''} onValueChange={(warehouseId) => setPoOperationForm({ ...poOperationForm, warehouseId })}><SelectTrigger><SelectValue placeholder="Select receiving warehouse" /></SelectTrigger><SelectContent>{warehouses.map(w => <SelectItem value={w.id} key={w.id}>{w.name}</SelectItem>)}</SelectContent></Select></div><div className="grid gap-3 sm:grid-cols-3">{[['Vehicle number','vehicleNo'],['Challan number','challanNo'],['Supplier invoice','invoiceReference']].map(([label,key]) => <div className="space-y-1.5" key={key}><Label>{label}</Label><Input value={poOperationForm[key] || ''} onChange={e => setPoOperationForm({ ...poOperationForm, [key]: e.target.value })} /></div>)}</div><div className="rounded-lg border"><div className="grid grid-cols-[1fr_100px] bg-gray-50 p-2 text-xs font-semibold uppercase text-gray-500"><span>Item</span><span>Open quantity</span></div>{poOperation.row.items?.map((item: any) => <div className="grid grid-cols-[1fr_100px] border-t p-2 text-sm" key={item.id}><span>{item.product?.name || item.description}</span><span>{Math.max(0, Number(item.quantity)-Number(item.receivedQty||0)-Number(item.shortClosedQty||0))}</span></div>)}</div></>}
-        {poOperation.operation === 'dispatch' && <div className="grid gap-3 sm:grid-cols-2">{[['Tracking / LR reference *','trackingReference'],['Carrier / transporter','carrier'],['Estimated arrival','estimatedArrivalAt']].map(([label,key]) => <div className="space-y-1.5" key={key}><Label>{label}</Label><Input type={key === 'estimatedArrivalAt' ? 'date' : 'text'} value={poOperationForm[key] || ''} onChange={e => setPoOperationForm({ ...poOperationForm, [key]: e.target.value })} /></div>)}</div>}
-        {poOperation.operation === 'delay-follow-up' && <div className="grid gap-3 sm:grid-cols-2"><div className="space-y-1.5"><Label>Reason / follow-up note *</Label><Input value={poOperationForm.reason || ''} onChange={e => setPoOperationForm({ ...poOperationForm, reason: e.target.value })} /></div><div className="space-y-1.5"><Label>Revised ETA</Label><Input type="date" value={poOperationForm.estimatedArrivalAt || ''} onChange={e => setPoOperationForm({ ...poOperationForm, estimatedArrivalAt: e.target.value })} /></div></div>}
-        <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setPoOperation(null)}>Cancel</Button><Button onClick={submitPoOperation}>{poOperation.operation === 'receive-goods' ? 'Create Gate Entry & GRN' : 'Save'}</Button></div></div>}</DialogContent>
+          {poOperation.operation === 'receive-goods' && <><div className="space-y-1.5"><Label>Receiving warehouse *</Label><Select value={poOperationForm.warehouseId || ''} onValueChange={(warehouseId) => setPoOperationForm({ ...poOperationForm, warehouseId })}><SelectTrigger><SelectValue placeholder="Select receiving warehouse" /></SelectTrigger><SelectContent>{warehouses.map(w => <SelectItem value={w.id} key={w.id}>{w.name}</SelectItem>)}</SelectContent></Select></div><div className="grid gap-3 sm:grid-cols-3">{[['Vehicle number', 'vehicleNo'], ['Challan number', 'challanNo'], ['Supplier invoice', 'invoiceReference']].map(([label, key]) => <div className="space-y-1.5" key={key}><Label>{label}</Label><Input value={poOperationForm[key] || ''} onChange={e => setPoOperationForm({ ...poOperationForm, [key]: e.target.value })} /></div>)}</div><div className="rounded-lg border"><div className="grid grid-cols-[1fr_100px] bg-gray-50 p-2 text-xs font-semibold uppercase text-gray-500"><span>Item</span><span>Open quantity</span></div>{poOperation.row.items?.map((item: any) => <div className="grid grid-cols-[1fr_100px] border-t p-2 text-sm" key={item.id}><span>{item.product?.name || item.description}</span><span>{Math.max(0, Number(item.quantity) - Number(item.receivedQty || 0) - Number(item.shortClosedQty || 0))}</span></div>)}</div></>}
+          {poOperation.operation === 'dispatch' && <div className="grid gap-3 sm:grid-cols-2">{[['Tracking / LR reference *', 'trackingReference'], ['Carrier / transporter', 'carrier'], ['Estimated arrival', 'estimatedArrivalAt']].map(([label, key]) => <div className="space-y-1.5" key={key}><Label>{label}</Label><Input type={key === 'estimatedArrivalAt' ? 'date' : 'text'} value={poOperationForm[key] || ''} onChange={e => setPoOperationForm({ ...poOperationForm, [key]: e.target.value })} /></div>)}</div>}
+          {poOperation.operation === 'delay-follow-up' && <div className="grid gap-3 sm:grid-cols-2"><div className="space-y-1.5"><Label>Reason / follow-up note *</Label><Input value={poOperationForm.reason || ''} onChange={e => setPoOperationForm({ ...poOperationForm, reason: e.target.value })} /></div><div className="space-y-1.5"><Label>Revised ETA</Label><Input type="date" value={poOperationForm.estimatedArrivalAt || ''} onChange={e => setPoOperationForm({ ...poOperationForm, estimatedArrivalAt: e.target.value })} /></div></div>}
+          <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setPoOperation(null)}>Cancel</Button><Button onClick={submitPoOperation}>{poOperation.operation === 'receive-goods' ? 'Create Gate Entry & GRN' : 'Save'}</Button></div></div>}</DialogContent>
       </Dialog>
     </div>
   );
@@ -639,10 +639,10 @@ function DocumentFields({ kind, form, setForm, suppliers, products, orders, rece
       )}
       {kind === 'supplier-quotations' && <>
         {[
-          ['AO Number','aoNo'], ['Accepted Order Number','acceptedOrderNo'], ['Accepted Order Date','acceptedOrderDate'], ['Vendor Order Number','vendorOrderNo'],
-          ['Bill-to Code','billToCode'], ['Bill-to Name','billToName'], ['Bill-to GSTIN','billToGstin'], ['Bill-to PAN','billToPan'],
-          ['Dispatch-to Code','dispatchToCode'], ['Dispatch-to Name','dispatchToName'], ['Dispatch-to GSTIN','dispatchToGstin'], ['Vendor Code','vendorCode'],
-          ['Contact Person','contactPerson'], ['Contact Number','contactNo'], ['Payment Terms','paymentTerms'], ['Documents To','documentsTo'],
+          ['AO Number', 'aoNo'], ['Accepted Order Number', 'acceptedOrderNo'], ['Accepted Order Date', 'acceptedOrderDate'], ['Vendor Order Number', 'vendorOrderNo'],
+          ['Bill-to Code', 'billToCode'], ['Bill-to Name', 'billToName'], ['Bill-to GSTIN', 'billToGstin'], ['Bill-to PAN', 'billToPan'],
+          ['Dispatch-to Code', 'dispatchToCode'], ['Dispatch-to Name', 'dispatchToName'], ['Dispatch-to GSTIN', 'dispatchToGstin'], ['Vendor Code', 'vendorCode'],
+          ['Contact Person', 'contactPerson'], ['Contact Number', 'contactNo'], ['Payment Terms', 'paymentTerms'], ['Documents To', 'documentsTo'],
         ].map(([label, key]) => <Field label={label} key={key}><Input value={form.vendorDocumentDetails?.[key] || ''} onChange={(e: any) => setForm({ ...form, vendorDocumentDetails: { ...(form.vendorDocumentDetails || {}), [key]: e.target.value } })} /></Field>)}
         <div className="space-y-1.5 md:col-span-2"><Label>Bill-to Address</Label><Textarea value={form.vendorDocumentDetails?.billToAddress || ''} onChange={(e: any) => setForm({ ...form, vendorDocumentDetails: { ...(form.vendorDocumentDetails || {}), billToAddress: e.target.value } })} /></div>
         <div className="space-y-1.5 md:col-span-2"><Label>Dispatch-to Address</Label><Textarea value={form.vendorDocumentDetails?.dispatchToAddress || ''} onChange={(e: any) => setForm({ ...form, vendorDocumentDetails: { ...(form.vendorDocumentDetails || {}), dispatchToAddress: e.target.value } })} /></div>
@@ -1241,7 +1241,7 @@ function LineEditor({ kind, lines, setLines, products, total, currency }: any) {
             Remove
           </Button>
           {kind === 'supplier-quotations' && <div className="grid gap-3 border-t pt-3 md:col-span-12 sm:grid-cols-2 lg:grid-cols-6">
-            {[['Category / CAT','categoryCode'],['HSN Code','hsnCode'],['Make / Brand','make'],['Quantity tolerance','quantityTolerance'],['Delivery date','deliveryDate'],['UOM','uom']].map(([label, key]) => <div className="space-y-1" key={key}><Label className="text-xs">{label}</Label><Input aria-label={label} type={key === 'deliveryDate' ? 'date' : 'text'} className="h-9 bg-white" placeholder={key === 'quantityTolerance' ? 'e.g. ±5%' : `Enter ${label.toLowerCase()}`} value={line[key] || ''} onChange={(e) => updateLine(lines, setLines, index, { [key]: e.target.value })} /></div>)}
+            {[['Category / CAT', 'categoryCode'], ['HSN Code', 'hsnCode'], ['Make / Brand', 'make'], ['Quantity tolerance', 'quantityTolerance'], ['Delivery date', 'deliveryDate'], ['UOM', 'uom']].map(([label, key]) => <div className="space-y-1" key={key}><Label className="text-xs">{label}</Label><Input aria-label={label} type={key === 'deliveryDate' ? 'date' : 'text'} className="h-9 bg-white" placeholder={key === 'quantityTolerance' ? 'e.g. ±5%' : `Enter ${label.toLowerCase()}`} value={line[key] || ''} onChange={(e) => updateLine(lines, setLines, index, { [key]: e.target.value })} /></div>)}
           </div>}
         </div>
       ))}
@@ -1366,15 +1366,15 @@ function payloadFor(kind: ProcurementKind, form: any, lines: any[]) {
     return form.purchaseOrderId
       ? form
       : {
-          ...form,
-          supplierId: form.supplierId,
-          items: lines.map((line) => ({
-            ...line,
-            receivedQty: line.quantity,
-            acceptedQty: line.quantity,
-            rate: line.unitPrice || line.rate,
-          })),
-        };
+        ...form,
+        supplierId: form.supplierId,
+        items: lines.map((line) => ({
+          ...line,
+          receivedQty: line.quantity,
+          acceptedQty: line.quantity,
+          rate: line.unitPrice || line.rate,
+        })),
+      };
   if (kind === 'supplier-quotations')
     return { ...form, items: lines.map((line) => ({ ...line, rate: line.unitPrice || line.rate })) };
   return { ...form, items: lines };
