@@ -243,6 +243,17 @@ export function ProcurementPage({ kind }: { kind: ProcurementKind }) {
       }
     }
 
+    if (kind === 'purchase-receipts') {
+      const missingBatch = lines.find((l: any) => {
+        const prod = products.find((p: any) => p.id === l.productId);
+        return prod?.hasBatchNo && !l.batchNo;
+      });
+      if (missingBatch) {
+        toast.error('Internal Batch Number is required for items that track batches');
+        return;
+      }
+    }
+
     setSubmitting(true);
     try {
       await api.post(meta.endpoint, payloadFor(kind, form, lines));
@@ -386,6 +397,8 @@ export function ProcurementPage({ kind }: { kind: ProcurementKind }) {
               orders={orders}
               receipts={receipts}
               invoices={invoices}
+              warehouses={warehouses}
+              setLines={setLines}
             />
             {needsLines(kind) && (
               <LineEditor
@@ -745,7 +758,7 @@ function Tracker({ rows, loading }: any) {
     </div>
   );
 }
-function DocumentFields({ kind, form, setForm, suppliers, products, orders, receipts, invoices }: any) {
+function DocumentFields({ kind, form, setForm, suppliers, products, orders, receipts, invoices, warehouses, setLines }: any) {
   return (
     <div className="grid gap-3 rounded-md border border-[#e5e2dc] bg-[#fbfaf8] p-3 md:grid-cols-4">
       {usesSupplier(kind) && (
@@ -940,32 +953,76 @@ function DocumentFields({ kind, form, setForm, suppliers, products, orders, rece
         </>
       )}
       {kind === 'purchase-receipts' && (
-        <div className="space-y-1.5">
-          <Label>From Purchase Order</Label>
-          <Select
-            value={form.purchaseOrderId || ''}
-            onValueChange={(v) => setForm({ ...form, purchaseOrderId: v })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Manual receipt or select PO" />
-            </SelectTrigger>
-            <SelectContent>
-              {orders.length === 0 ? (
-                <SelectEmptyState
-                  message="No purchase orders found"
-                  linkHref="/procurement/purchase-orders"
-                  linkText="Create Purchase Order"
-                />
-              ) : (
-                orders.map((o: any) => (
-                  <SelectItem key={o.id} value={o.id}>
-                    {o.orderNo} - {o.supplier?.name}
-                  </SelectItem>
-                ))
-              )}
-            </SelectContent>
-          </Select>
-        </div>
+        <>
+          <div className="space-y-1.5">
+            <Label>From Purchase Order</Label>
+            <Select
+              value={form.purchaseOrderId || ''}
+              onValueChange={(v) => {
+              setForm({ ...form, purchaseOrderId: v, supplierId: orders.find((o: any) => o.id === v)?.supplierId });
+              const po = orders.find((o: any) => o.id === v);
+              if (po?.items?.length) {
+                setLines(po.items.map((item: any) => ({
+                  purchaseOrderItemId: item.id,
+                  productId: item.productId,
+                  quantity: Number(item.quantity) - Number(item.acceptedQty || 0),
+                  unitPrice: Number(item.unitPrice || 0),
+                  rate: Number(item.unitPrice || 0),
+                  batchNo: '',
+                  supplierBatchNo: '',
+                  discount: 0,
+                  taxRate: 0,
+                })));
+              }
+            }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Manual receipt or select PO" />
+              </SelectTrigger>
+              <SelectContent>
+                {orders.length === 0 ? (
+                  <SelectEmptyState
+                    message="No purchase orders found"
+                    linkHref="/procurement/purchase-orders"
+                    linkText="Create Purchase Order"
+                  />
+                ) : (
+                  orders.map((o: any) => (
+                    <SelectItem key={o.id} value={o.id}>
+                      {o.orderNo} - {o.supplier?.name}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Receiving Warehouse *</Label>
+            <Select
+              value={form.warehouseId || ''}
+              onValueChange={(v) => setForm({ ...form, warehouseId: v })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select receiving warehouse" />
+              </SelectTrigger>
+              <SelectContent>
+                {warehouses.length === 0 ? (
+                  <SelectEmptyState
+                    message="No warehouses found"
+                    linkHref="/inventory/warehouses"
+                    linkText="Create Warehouse"
+                  />
+                ) : (
+                  warehouses.map((w: any) => (
+                    <SelectItem key={w.id} value={w.id}>
+                      {w.name} {w.code ? `(${w.code})` : ''}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+        </>
       )}
       {kind === 'purchase-invoices' && (
         <>
@@ -1379,6 +1436,10 @@ function LineEditor({ kind, lines, setLines, products, total, currency }: any) {
           >
             Remove
           </Button>
+          {kind === 'purchase-receipts' && <div className="grid gap-3 border-t pt-3 md:col-span-12 sm:grid-cols-2">
+            <div className="space-y-1"><Label className="text-xs">Internal Batch No {products.find((p: any) => p.id === line.productId)?.hasBatchNo ? '*' : ''}</Label><Input aria-label="Batch number" className="h-8 bg-white" placeholder="e.g. BATCH-001" value={line.batchNo || ''} onChange={(e: any) => updateLine(lines, setLines, index, { batchNo: e.target.value })} /></div>
+            <div className="space-y-1"><Label className="text-xs">Supplier Batch</Label><Input aria-label="Supplier batch" className="h-8 bg-white" placeholder="Optional" value={line.supplierBatchNo || ''} onChange={(e: any) => updateLine(lines, setLines, index, { supplierBatchNo: e.target.value })} /></div>
+          </div>}
           {kind === 'supplier-quotations' && <div className="grid gap-3 border-t pt-3 md:col-span-12 sm:grid-cols-2 lg:grid-cols-6">
             {[['Category / CAT', 'categoryCode'], ['HSN Code', 'hsnCode'], ['Make / Brand', 'make'], ['Quantity tolerance', 'quantityTolerance'], ['Delivery date', 'deliveryDate'], ['UOM', 'uom']].map(([label, key]) => <div className="space-y-1" key={key}><Label className="text-xs">{label}</Label><Input aria-label={label} type={key === 'deliveryDate' ? 'date' : 'text'} className="h-9 bg-white" placeholder={key === 'quantityTolerance' ? 'e.g. ±5%' : `Enter ${label.toLowerCase()}`} value={line[key] || ''} onChange={(e) => updateLine(lines, setLines, index, { [key]: e.target.value })} /></div>)}
           </div>}
@@ -1503,12 +1564,14 @@ function payloadFor(kind: ProcurementKind, form: any, lines: any[]) {
     return form;
   if (kind === 'purchase-receipts')
     return form.purchaseOrderId
-      ? form
+      ? { ...form, warehouseId: form.warehouseId, items: lines.filter((l: any) => l.productId).map((line: any) => ({ ...line, warehouseId: form.warehouseId, receivedQty: line.quantity, acceptedQty: line.quantity, rate: line.unitPrice || line.rate })) }
       : {
         ...form,
         supplierId: form.supplierId,
+        warehouseId: form.warehouseId,
         items: lines.map((line) => ({
           ...line,
+          warehouseId: form.warehouseId,
           receivedQty: line.quantity,
           acceptedQty: line.quantity,
           rate: line.unitPrice || line.rate,
