@@ -43,6 +43,7 @@ export default function StockMovementsPage() {
     batchNo: '',
     serialNo: '',
   });
+  const selectedProduct = products.find((p) => p.id === form.productId);
   const limit = 20;
 
   const fetchAll = async () => {
@@ -222,7 +223,14 @@ export default function StockMovementsPage() {
           <form onSubmit={handleCreate} className="space-y-4 mt-2">
             <div className="space-y-1.5">
               <Label>Product *</Label>
-              <Select value={form.productId} onValueChange={(v) => setForm((f) => ({ ...f, productId: v }))}>
+              <Select value={form.productId} onValueChange={(v) =>
+                setForm((f) => ({
+                  ...f,
+                  productId: v,
+                  batchNumber: '',
+                  serialNumber: '',
+                }))
+              }>
                 <SelectTrigger>
                   <SelectValue placeholder="Select product" />
                 </SelectTrigger>
@@ -322,6 +330,33 @@ export default function StockMovementsPage() {
                 />
               </div>
             </div>
+            {(selectedProduct?.hasBatchNo || selectedProduct?.hasSerialNo) && (
+  <div className={`grid gap-3 ${selectedProduct.hasBatchNo && selectedProduct.hasSerialNo ? 'grid-cols-2' : 'grid-cols-1'}`}>
+          {selectedProduct.hasBatchNo && (
+            <div className="space-y-1.5">
+              <Label>Batch Number</Label>
+              <Input
+                value={form.batchNumber}
+                onChange={(e) => setForm((f) => ({ ...f, batchNumber: e.target.value }))}
+                placeholder="BATCH-LAP-01"
+                required
+              />
+            </div>
+          )}
+
+          {selectedProduct.hasSerialNo && (
+            <div className="space-y-1.5">
+              <Label>Serial Number</Label>
+              <Input
+                value={form.serialNumber}
+                onChange={(e) => setForm((f) => ({ ...f, serialNumber: e.target.value }))}
+                placeholder="SERIAL-LAP-01..."
+                required
+              />
+            </div>
+          )}
+  </div>
+)}
             <div className="space-y-1.5">
               <Label>Reference</Label>
               <Input
