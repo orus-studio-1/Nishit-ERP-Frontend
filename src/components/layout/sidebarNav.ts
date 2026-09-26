@@ -156,6 +156,7 @@ export const navItems: NavItem[] = [
       { label: 'General Settings', href: '/settings', icon: SlidersHorizontal },
       { label: 'Organization Setup', href: '/settings/organization', icon: Building2, permission: 'company:company:read' },
       { label: 'Access Control', href: '/settings/access', icon: KeyRound, permission: 'access:users:read' },
+      { label: 'Tally Integration', href: '/settings/tally', icon: Repeat },
       { label: 'Organization Audit Trail', href: '/audit-trail', icon: History, permission: 'access:audit:read' },
     ],
   },
