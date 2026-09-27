@@ -415,10 +415,10 @@ export function ProcurementPage({ kind }: { kind: ProcurementKind }) {
       </Dialog>
       <Dialog open={!!poOperation} onOpenChange={(value) => !value && setPoOperation(null)}>
         <DialogContent className="max-w-2xl"><DialogHeader><DialogTitle>{poOperation?.operation === 'dispatch' ? 'Record Goods in Transit' : poOperation?.operation === 'receive-goods' ? 'Gate Entry and Goods Receipt' : 'Supplier Delay Follow-up'}</DialogTitle></DialogHeader>{poOperation && <div className="space-y-4"><div className="rounded-lg border bg-gray-50 p-3 text-sm"><span className="font-mono font-semibold">{poOperation.row.poNo}</span><span className="text-gray-500"> · {poOperation.row.supplier?.name}</span></div>
-        {poOperation.operation === 'receive-goods' && <><div className="space-y-1.5"><Label>Receiving warehouse *</Label><Select value={poOperationForm.warehouseId || ''} onValueChange={(warehouseId) => setPoOperationForm({ ...poOperationForm, warehouseId })}><SelectTrigger><SelectValue placeholder="Select receiving warehouse" /></SelectTrigger><SelectContent>{warehouses.map(w => <SelectItem value={w.id} key={w.id}>{w.name}</SelectItem>)}</SelectContent></Select></div><div className="grid gap-3 sm:grid-cols-3">{[['Vehicle number','vehicleNo'],['Challan number','challanNo'],['Supplier invoice','invoiceReference']].map(([label,key]) => <div className="space-y-1.5" key={key}><Label>{label}</Label><Input value={poOperationForm[key] || ''} onChange={e => setPoOperationForm({ ...poOperationForm, [key]: e.target.value })} /></div>)}</div><div className="rounded-lg border"><div className="grid grid-cols-[1fr_100px] bg-gray-50 p-2 text-xs font-semibold uppercase text-gray-500"><span>Item</span><span>Open quantity</span></div>{poOperation.row.items?.map((item: any) => <div className="grid grid-cols-[1fr_100px] border-t p-2 text-sm" key={item.id}><span>{item.product?.name || item.description}</span><span>{Math.max(0, Number(item.quantity)-Number(item.receivedQty||0)-Number(item.shortClosedQty||0))}</span></div>)}</div></>}
-        {poOperation.operation === 'dispatch' && <div className="grid gap-3 sm:grid-cols-2">{[['Tracking / LR reference *','trackingReference'],['Carrier / transporter','carrier'],['Estimated arrival','estimatedArrivalAt']].map(([label,key]) => <div className="space-y-1.5" key={key}><Label>{label}</Label><Input type={key === 'estimatedArrivalAt' ? 'date' : 'text'} value={poOperationForm[key] || ''} onChange={e => setPoOperationForm({ ...poOperationForm, [key]: e.target.value })} /></div>)}</div>}
-        {poOperation.operation === 'delay-follow-up' && <div className="grid gap-3 sm:grid-cols-2"><div className="space-y-1.5"><Label>Reason / follow-up note *</Label><Input value={poOperationForm.reason || ''} onChange={e => setPoOperationForm({ ...poOperationForm, reason: e.target.value })} /></div><div className="space-y-1.5"><Label>Revised ETA</Label><Input type="date" value={poOperationForm.estimatedArrivalAt || ''} onChange={e => setPoOperationForm({ ...poOperationForm, estimatedArrivalAt: e.target.value })} /></div></div>}
-        <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setPoOperation(null)}>Cancel</Button><Button onClick={submitPoOperation}>{poOperation.operation === 'receive-goods' ? 'Create Gate Entry & GRN' : 'Save'}</Button></div></div>}</DialogContent>
+          {poOperation.operation === 'receive-goods' && <><div className="space-y-1.5"><Label>Receiving warehouse *</Label><Select value={poOperationForm.warehouseId || ''} onValueChange={(warehouseId) => setPoOperationForm({ ...poOperationForm, warehouseId })}><SelectTrigger><SelectValue placeholder="Select receiving warehouse" /></SelectTrigger><SelectContent>{warehouses.map(w => <SelectItem value={w.id} key={w.id}>{w.name}</SelectItem>)}</SelectContent></Select></div><div className="grid gap-3 sm:grid-cols-3">{[['Vehicle number', 'vehicleNo'], ['Challan number', 'challanNo'], ['Supplier invoice', 'invoiceReference']].map(([label, key]) => <div className="space-y-1.5" key={key}><Label>{label}</Label><Input value={poOperationForm[key] || ''} onChange={e => setPoOperationForm({ ...poOperationForm, [key]: e.target.value })} /></div>)}</div><div className="rounded-lg border"><div className="grid grid-cols-[1fr_100px] bg-gray-50 p-2 text-xs font-semibold uppercase text-gray-500"><span>Item</span><span>Open quantity</span></div>{poOperation.row.items?.map((item: any) => <div className="grid grid-cols-[1fr_100px] border-t p-2 text-sm" key={item.id}><span>{item.product?.name || item.description}</span><span>{Math.max(0, Number(item.quantity) - Number(item.receivedQty || 0) - Number(item.shortClosedQty || 0))}</span></div>)}</div></>}
+          {poOperation.operation === 'dispatch' && <div className="grid gap-3 sm:grid-cols-2">{[['Tracking / LR reference *', 'trackingReference'], ['Carrier / transporter', 'carrier'], ['Estimated arrival', 'estimatedArrivalAt']].map(([label, key]) => <div className="space-y-1.5" key={key}><Label>{label}</Label><Input type={key === 'estimatedArrivalAt' ? 'date' : 'text'} value={poOperationForm[key] || ''} onChange={e => setPoOperationForm({ ...poOperationForm, [key]: e.target.value })} /></div>)}</div>}
+          {poOperation.operation === 'delay-follow-up' && <div className="grid gap-3 sm:grid-cols-2"><div className="space-y-1.5"><Label>Reason / follow-up note *</Label><Input value={poOperationForm.reason || ''} onChange={e => setPoOperationForm({ ...poOperationForm, reason: e.target.value })} /></div><div className="space-y-1.5"><Label>Revised ETA</Label><Input type="date" value={poOperationForm.estimatedArrivalAt || ''} onChange={e => setPoOperationForm({ ...poOperationForm, estimatedArrivalAt: e.target.value })} /></div></div>}
+          <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setPoOperation(null)}>Cancel</Button><Button onClick={submitPoOperation}>{poOperation.operation === 'receive-goods' ? 'Create Gate Entry & GRN' : 'Save'}</Button></div></div>}</DialogContent>
       </Dialog>
     </div>
   );
@@ -571,41 +571,180 @@ function BuyingSettings({ data, reload }: any) {
 }
 
 function Tracker({ rows, loading }: any) {
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+  const [filterSupplier, setFilterSupplier] = useState('');
+  const [filterStatus, setFilterStatus] = useState('ALL');
+
+  const toggleRow = (id: string) => setExpandedRows(prev => ({ ...prev, [id]: !prev[id] }));
+
+  const filtered = useMemo(() => {
+    return (rows || []).filter((r: any) => {
+      if (filterSupplier && !r.supplier?.toLowerCase().includes(filterSupplier.toLowerCase())) return false;
+      if (filterStatus !== 'ALL' && r.status !== filterStatus) return false;
+      return true;
+    });
+  }, [rows, filterSupplier, filterStatus]);
+
+  // Build flat pending items for export
+  const pendingItems = useMemo(() => {
+    const items: any[] = [];
+    for (const row of filtered) {
+      for (const item of (row.items || [])) {
+        if (item.pending > 0) {
+          items.push({
+            poNo: row.orderNo,
+            supplier: row.supplier,
+            poStatus: row.status,
+            product: item.product,
+            sku: item.sku || '',
+            ordered: item.ordered,
+            received: item.received,
+            pending: item.pending,
+            uom: item.uom || '',
+          });
+        }
+      }
+    }
+    return items;
+  }, [filtered]);
+
+  function exportToExcel() {
+    if (!pendingItems.length) { toast.error('No pending items to export'); return; }
+    const headers = ['PO #', 'Supplier', 'PO Status', 'Product', 'SKU', 'Ordered', 'Received', 'Pending', 'UOM'];
+    const csvRows = [headers.join(',')];
+    for (const item of pendingItems) {
+      csvRows.push([
+        item.poNo, `"${item.supplier}"`, item.poStatus, `"${item.product}"`, item.sku,
+        item.ordered, item.received, item.pending, item.uom
+      ].join(','));
+    }
+    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `pending_material_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    toast.success(`Exported ${pendingItems.length} pending items`);
+  }
+
+  const statuses = useMemo(() => {
+    const set = new Set<string>();
+    for (const r of rows || []) set.add(r.status);
+    return Array.from(set).sort();
+  }, [rows]);
+
+  const totalPending = pendingItems.reduce((s: number, i: any) => s + i.pending, 0);
+
   return (
     <div className="space-y-4">
-      <PageHeader
-        title="Procurement Tracker"
-        description="MR to RFQ to Supplier Quotation to PO to Receipt to Invoice to Payment status per order"
-      />
-      <DataTable
-        data={rows}
-        isLoading={loading}
-        columns={[
-          {
-            key: 'orderNo',
-            header: 'PO',
-            render: (r: any) => <span className="font-mono text-xs font-semibold text-[#1674c4]">{r.orderNo}</span>,
-          },
-          { key: 'supplier', header: 'Supplier' },
-          { key: 'status', header: 'Status', render: (r: any) => <StatusBadge status={r.status} /> },
-          {
-            key: 'receivedPercent',
-            header: 'Received %',
-            render: (r: any) => `${Number(r.receivedPercent || 0).toFixed(0)}%`,
-          },
-          {
-            key: 'billedPercent',
-            header: 'Billed %',
-            render: (r: any) => `${Number(r.billedPercent || 0).toFixed(0)}%`,
-          },
-          { key: 'total', header: 'Total', render: (r: any) => formatCurrency(Number(r.total || 0)) },
-          { key: 'chain', header: 'Chain', render: (r: any) => `R:${r.receipts} I:${r.invoices} P:${r.payments}` },
-        ]}
-      />
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">Consolidated Pending Material</h1>
+          <p className="mt-1 text-sm text-gray-500">Bird's-eye view of all POs with pending material — filter, drill down, and export to Excel</p>
+        </div>
+        <Button onClick={exportToExcel} className="gap-2" disabled={!pendingItems.length}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+          Export to Excel ({pendingItems.length} items)
+        </Button>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-4">
+        <div className="rounded-md border border-[#e5e2dc] bg-white p-4">
+          <p className="text-xs text-gray-500">Total Open POs</p>
+          <p className="mt-1 text-xl font-semibold">{filtered.length}</p>
+        </div>
+        <div className="rounded-md border border-[#e5e2dc] bg-white p-4">
+          <p className="text-xs text-gray-500">POs with Pending Material</p>
+          <p className="mt-1 text-xl font-semibold text-amber-600">{filtered.filter((r: any) => (r.items || []).some((i: any) => i.pending > 0)).length}</p>
+        </div>
+        <div className="rounded-md border border-[#e5e2dc] bg-white p-4">
+          <p className="text-xs text-gray-500">Pending Line Items</p>
+          <p className="mt-1 text-xl font-semibold text-red-600">{pendingItems.length}</p>
+        </div>
+        <div className="rounded-md border border-[#e5e2dc] bg-white p-4">
+          <p className="text-xs text-gray-500">Total Pending Qty</p>
+          <p className="mt-1 text-xl font-semibold">{totalPending.toLocaleString('en-IN')}</p>
+        </div>
+      </div>
+
+      <div className="flex gap-3">
+        <Input placeholder="Filter by supplier..." value={filterSupplier} onChange={e => setFilterSupplier(e.target.value)} className="max-w-xs" />
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="rounded-md border border-[#e5e2dc] px-3 py-2 text-sm">
+          <option value="ALL">All Statuses</option>
+          {statuses.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+      </div>
+
+      <div className="rounded-md border border-[#e5e2dc] bg-white overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
+            <tr>
+              <th className="px-4 py-3 w-8"></th>
+              <th className="px-4 py-3">PO #</th>
+              <th className="px-4 py-3">Supplier</th>
+              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Received %</th>
+              <th className="px-4 py-3">Billed %</th>
+              <th className="px-4 py-3">Total</th>
+              <th className="px-4 py-3">Pending Items</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading && <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">Loading...</td></tr>}
+            {!loading && !filtered.length && <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">No purchase orders found</td></tr>}
+            {filtered.map((row: any) => {
+              const pendingCount = (row.items || []).filter((i: any) => i.pending > 0).length;
+              const isExpanded = expandedRows[row.id];
+              return (
+                <>
+                  <tr key={row.id} className={`border-t border-[#e5e2dc] cursor-pointer hover:bg-gray-50/60 ${pendingCount > 0 ? '' : 'opacity-60'}`} onClick={() => toggleRow(row.id)}>
+                    <td className="px-4 py-3 text-gray-400">{pendingCount > 0 ? (isExpanded ? '▼' : '▶') : '—'}</td>
+                    <td className="px-4 py-3">
+                      <Link href={`/procurement/purchase-orders/${row.id}`} className="font-mono text-xs font-semibold text-[#1674c4] hover:underline" onClick={e => e.stopPropagation()}>
+                        {row.orderNo}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 font-medium">{row.supplier}</td>
+                    <td className="px-4 py-3"><StatusBadge status={row.status} /></td>
+                    <td className="px-4 py-3">{Number(row.receivedPercent || 0).toFixed(0)}%</td>
+                    <td className="px-4 py-3">{Number(row.billedPercent || 0).toFixed(0)}%</td>
+                    <td className="px-4 py-3">{formatCurrency(Number(row.total || 0))}</td>
+                    <td className="px-4 py-3">
+                      {pendingCount > 0 ? <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">{pendingCount} pending</span> : <span className="text-xs text-emerald-600">✓ All received</span>}
+                    </td>
+                  </tr>
+                  {isExpanded && pendingCount > 0 && (
+                    <tr key={`${row.id}-items`} className="border-t border-[#e5e2dc] bg-gray-50/40">
+                      <td colSpan={8} className="px-6 py-3">
+                        <table className="w-full text-xs">
+                          <thead className="text-left text-gray-500 uppercase">
+                            <tr><th className="px-3 py-1.5">Product</th><th className="px-3 py-1.5">SKU</th><th className="px-3 py-1.5">Ordered</th><th className="px-3 py-1.5">Received</th><th className="px-3 py-1.5">Pending</th><th className="px-3 py-1.5">UOM</th></tr>
+                          </thead>
+                          <tbody>
+                            {(row.items || []).filter((i: any) => i.pending > 0).map((item: any, idx: number) => (
+                              <tr key={idx} className="border-t border-[#e5e2dc]">
+                                <td className="px-3 py-1.5 font-medium">{item.product}</td>
+                                <td className="px-3 py-1.5 text-gray-500">{item.sku || '—'}</td>
+                                <td className="px-3 py-1.5">{item.ordered}</td>
+                                <td className="px-3 py-1.5 text-emerald-700">{item.received}</td>
+                                <td className="px-3 py-1.5 font-semibold text-red-600">{item.pending}</td>
+                                <td className="px-3 py-1.5">{item.uom || '—'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </td>
+                    </tr>
+                  )}
+                </>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
-
 function DocumentFields({ kind, form, setForm, suppliers, products, orders, receipts, invoices }: any) {
   return (
     <div className="grid gap-3 rounded-md border border-[#e5e2dc] bg-[#fbfaf8] p-3 md:grid-cols-4">
@@ -639,10 +778,10 @@ function DocumentFields({ kind, form, setForm, suppliers, products, orders, rece
       )}
       {kind === 'supplier-quotations' && <>
         {[
-          ['AO Number','aoNo'], ['Accepted Order Number','acceptedOrderNo'], ['Accepted Order Date','acceptedOrderDate'], ['Vendor Order Number','vendorOrderNo'],
-          ['Bill-to Code','billToCode'], ['Bill-to Name','billToName'], ['Bill-to GSTIN','billToGstin'], ['Bill-to PAN','billToPan'],
-          ['Dispatch-to Code','dispatchToCode'], ['Dispatch-to Name','dispatchToName'], ['Dispatch-to GSTIN','dispatchToGstin'], ['Vendor Code','vendorCode'],
-          ['Contact Person','contactPerson'], ['Contact Number','contactNo'], ['Payment Terms','paymentTerms'], ['Documents To','documentsTo'],
+          ['AO Number', 'aoNo'], ['Accepted Order Number', 'acceptedOrderNo'], ['Accepted Order Date', 'acceptedOrderDate'], ['Vendor Order Number', 'vendorOrderNo'],
+          ['Bill-to Code', 'billToCode'], ['Bill-to Name', 'billToName'], ['Bill-to GSTIN', 'billToGstin'], ['Bill-to PAN', 'billToPan'],
+          ['Dispatch-to Code', 'dispatchToCode'], ['Dispatch-to Name', 'dispatchToName'], ['Dispatch-to GSTIN', 'dispatchToGstin'], ['Vendor Code', 'vendorCode'],
+          ['Contact Person', 'contactPerson'], ['Contact Number', 'contactNo'], ['Payment Terms', 'paymentTerms'], ['Documents To', 'documentsTo'],
         ].map(([label, key]) => <Field label={label} key={key}><Input value={form.vendorDocumentDetails?.[key] || ''} onChange={(e: any) => setForm({ ...form, vendorDocumentDetails: { ...(form.vendorDocumentDetails || {}), [key]: e.target.value } })} /></Field>)}
         <div className="space-y-1.5 md:col-span-2"><Label>Bill-to Address</Label><Textarea value={form.vendorDocumentDetails?.billToAddress || ''} onChange={(e: any) => setForm({ ...form, vendorDocumentDetails: { ...(form.vendorDocumentDetails || {}), billToAddress: e.target.value } })} /></div>
         <div className="space-y-1.5 md:col-span-2"><Label>Dispatch-to Address</Label><Textarea value={form.vendorDocumentDetails?.dispatchToAddress || ''} onChange={(e: any) => setForm({ ...form, vendorDocumentDetails: { ...(form.vendorDocumentDetails || {}), dispatchToAddress: e.target.value } })} /></div>
@@ -1241,7 +1380,7 @@ function LineEditor({ kind, lines, setLines, products, total, currency }: any) {
             Remove
           </Button>
           {kind === 'supplier-quotations' && <div className="grid gap-3 border-t pt-3 md:col-span-12 sm:grid-cols-2 lg:grid-cols-6">
-            {[['Category / CAT','categoryCode'],['HSN Code','hsnCode'],['Make / Brand','make'],['Quantity tolerance','quantityTolerance'],['Delivery date','deliveryDate'],['UOM','uom']].map(([label, key]) => <div className="space-y-1" key={key}><Label className="text-xs">{label}</Label><Input aria-label={label} type={key === 'deliveryDate' ? 'date' : 'text'} className="h-9 bg-white" placeholder={key === 'quantityTolerance' ? 'e.g. ±5%' : `Enter ${label.toLowerCase()}`} value={line[key] || ''} onChange={(e) => updateLine(lines, setLines, index, { [key]: e.target.value })} /></div>)}
+            {[['Category / CAT', 'categoryCode'], ['HSN Code', 'hsnCode'], ['Make / Brand', 'make'], ['Quantity tolerance', 'quantityTolerance'], ['Delivery date', 'deliveryDate'], ['UOM', 'uom']].map(([label, key]) => <div className="space-y-1" key={key}><Label className="text-xs">{label}</Label><Input aria-label={label} type={key === 'deliveryDate' ? 'date' : 'text'} className="h-9 bg-white" placeholder={key === 'quantityTolerance' ? 'e.g. ±5%' : `Enter ${label.toLowerCase()}`} value={line[key] || ''} onChange={(e) => updateLine(lines, setLines, index, { [key]: e.target.value })} /></div>)}
           </div>}
         </div>
       ))}
@@ -1366,15 +1505,15 @@ function payloadFor(kind: ProcurementKind, form: any, lines: any[]) {
     return form.purchaseOrderId
       ? form
       : {
-          ...form,
-          supplierId: form.supplierId,
-          items: lines.map((line) => ({
-            ...line,
-            receivedQty: line.quantity,
-            acceptedQty: line.quantity,
-            rate: line.unitPrice || line.rate,
-          })),
-        };
+        ...form,
+        supplierId: form.supplierId,
+        items: lines.map((line) => ({
+          ...line,
+          receivedQty: line.quantity,
+          acceptedQty: line.quantity,
+          rate: line.unitPrice || line.rate,
+        })),
+      };
   if (kind === 'supplier-quotations')
     return { ...form, items: lines.map((line) => ({ ...line, rate: line.unitPrice || line.rate })) };
   return { ...form, items: lines };
