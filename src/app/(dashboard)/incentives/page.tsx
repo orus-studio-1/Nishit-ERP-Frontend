@@ -3,8 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Plus, Pencil, BadgePercent } from 'lucide-react';
-import api from '@/lib/api';
-import { showApiError } from '@/lib/apiError';
+import { usePaginatedList } from '@/hooks/usePaginatedList';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
 import { Pagination } from '@/components/shared/Pagination';
@@ -16,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { SchemeFormDialog } from '@/components/incentives/SchemeFormDialog';
 import {
   SCHEME_STATUSES, formatSchemeDate, humanize, useIncentivePermission,
-  type IncentiveScheme, type Paged,
+  type IncentiveScheme,
 } from '@/lib/incentives';
 
 const ALL = '__all__';
@@ -24,48 +23,26 @@ const LIMIT = 20;
 
 export default function IncentiveSchemesPage() {
   const can = useIncentivePermission();
-  const [schemes, setSchemes] = useState<IncentiveScheme[]>([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [manufacturer, setManufacturer] = useState('');
   const [debouncedManufacturer, setDebouncedManufacturer] = useState('');
   const [status, setStatus] = useState(ALL);
-  const [refreshKey, setRefreshKey] = useState(0);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<IncentiveScheme | null>(null);
+
+  const { items: schemes, total, page, setPage, isLoading, error: loadError, reload: fetchSchemes } = usePaginatedList<IncentiveScheme>(
+    '/incentives/schemes',
+    { search: debouncedSearch || undefined, manufacturer: debouncedManufacturer || undefined, status: status === ALL ? undefined : status },
+    [debouncedSearch, debouncedManufacturer, status],
+    { limit: LIMIT, errorMessage: 'Failed to load incentive schemes' },
+  );
 
   useEffect(() => {
     const t = setTimeout(() => { setDebouncedSearch(search.trim()); setDebouncedManufacturer(manufacturer.trim()); setPage(1); }, 300);
     return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, manufacturer]);
-
-  useEffect(() => {
-    let cancelled = false;
-    api.get('/incentives/schemes', {
-      params: {
-        page, limit: LIMIT,
-        search: debouncedSearch || undefined,
-        manufacturer: debouncedManufacturer || undefined,
-        status: status === ALL ? undefined : status,
-      },
-    })
-      .then((res) => {
-        if (cancelled) return;
-        const data: Paged<IncentiveScheme> = res.data?.data;
-        setSchemes(data?.items || []);
-        setTotal(data?.total || 0);
-        setLoadError(null);
-      })
-      .catch((err) => { if (!cancelled) setLoadError(showApiError(err, 'Failed to load incentive schemes') || 'Failed to load incentive schemes'); })
-      .finally(() => { if (!cancelled) setIsLoading(false); });
-    return () => { cancelled = true; };
-  }, [page, debouncedSearch, debouncedManufacturer, status, refreshKey]);
-
-  const fetchSchemes = () => { setIsLoading(true); setLoadError(null); setRefreshKey((k) => k + 1); };
 
   const hasFilters = Boolean(debouncedSearch || debouncedManufacturer || status !== ALL);
   const canCreate = can('schemes', 'create');
@@ -129,7 +106,7 @@ export default function IncentiveSchemesPage() {
       ) : (
         <>
           <DataTable columns={columns} data={schemes} isLoading={isLoading} onRowClick={undefined} />
-          {total > LIMIT && <Pagination page={page} totalPages={Math.ceil(total / LIMIT)} total={total} limit={LIMIT} onPageChange={(p) => { setIsLoading(true); setPage(p); }} />}
+          {total > LIMIT && <Pagination page={page} totalPages={Math.ceil(total / LIMIT)} total={total} limit={LIMIT} onPageChange={setPage} />}
         </>
       )}
 

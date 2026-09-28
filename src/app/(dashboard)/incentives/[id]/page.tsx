@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, BadgePercent, Calculator, Pencil, Plus, RefreshCw, Target, Trash2, TrendingUp, Wallet } from 'lucide-react';
+import { ArrowLeft, BadgePercent, Calculator, CheckCircle2, Pencil, Plus, RefreshCw, Target, Trash2, TrendingUp, Undo2, Wallet } from 'lucide-react';
 import api from '@/lib/api';
 import { showApiError, showApiSuccess } from '@/lib/apiError';
+import { usePaginatedList } from '@/hooks/usePaginatedList';
 import { formatDateTime } from '@/lib/utils';
 import { StatsCard } from '@/components/shared/StatsCard';
 import { StatusBadge } from '@/components/shared/StatusBadge';
@@ -19,9 +20,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SchemeFormDialog } from '@/components/incentives/SchemeFormDialog';
 import { SlabDialog } from '@/components/incentives/SlabDialog';
+import { SettleContributionDialog } from '@/components/incentives/SettleContributionDialog';
 import {
   CONTRIBUTION_STATUSES, STATUS_TRANSITIONS, formatAmount, formatMeasure, formatQuantity, formatReward, formatSchemeDate, humanize, useIncentivePermission,
-  type CalculationResult, type IncentiveContribution, type IncentiveRun, type IncentiveScheme, type IncentiveSlab, type Paged, type SchemeStatus, type SchemeSummary,
+  type CalculationResult, type IncentiveContribution, type IncentiveRun, type IncentiveScheme, type IncentiveSlab, type SchemeStatus, type SchemeSummary,
 } from '@/lib/incentives';
 
 const LIMIT = 20;
@@ -198,7 +200,7 @@ export default function IncentiveSchemeDetailPage() {
 
       {summary && (
         <>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <StatsCard
               title={type === 'VALUE' ? 'Eligible Value' : 'Eligible Quantity'}
               value={type === 'VALUE' ? formatAmount(summary.achievement.eligibleValue) : `${formatQuantity(summary.achievement.eligibleQuantity)} units`}
@@ -210,6 +212,12 @@ export default function IncentiveSchemeDetailPage() {
               value={formatAmount(summary.incentive.primaryAmount)}
               subtitle={summary.incentive.alternateAmount !== null ? `Alternate: ${formatAmount(summary.incentive.alternateAmount)}` : 'Not settled or approved'}
               icon={Wallet} iconColor="text-green-600" iconBg="bg-green-50"
+            />
+            <StatsCard
+              title="Received"
+              value={formatAmount(summary.incentive.settledAmount)}
+              subtitle={`${summary.incentive.settledCount} of ${summary.achievement.activeContributions} settled`}
+              icon={CheckCircle2} iconColor="text-emerald-600" iconBg="bg-emerald-50"
             />
             <StatsCard
               title="Current Slab"
@@ -326,7 +334,7 @@ export default function IncentiveSchemeDetailPage() {
           )}
         </TabsContent>
 
-        {can('contributions', 'read') && <TabsContent value="contributions"><ContributionsTab schemeId={id} type={type} refreshKey={refreshKey} /></TabsContent>}
+        {can('contributions', 'read') && <TabsContent value="contributions"><ContributionsTab schemeId={id} type={type} refreshKey={refreshKey} onSettled={refreshAll} canSettle={can('contributions', 'write')} /></TabsContent>}
         {can('calculations', 'read') && <TabsContent value="runs"><RunsTab schemeId={id} refreshKey={refreshKey} /></TabsContent>}
       </Tabs>
 
@@ -339,29 +347,27 @@ export default function IncentiveSchemeDetailPage() {
   );
 }
 
-function ContributionsTab({ schemeId, type, refreshKey }: { schemeId: string; type: IncentiveScheme['measurementType']; refreshKey: number }) {
-  const [items, setItems] = useState<IncentiveContribution[]>([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
+function ContributionsTab({ schemeId, type, refreshKey, onSettled, canSettle }: { schemeId: string; type: IncentiveScheme['measurementType']; refreshKey: number; onSettled: () => void; canSettle: boolean }) {
   const [status, setStatus] = useState<string>('ACTIVE');
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { items, total, page, setPage, isLoading, error } = usePaginatedList<IncentiveContribution>(
+    `/incentives/schemes/${schemeId}/contributions`, { status }, [schemeId, status, refreshKey], { limit: LIMIT, errorMessage: 'Failed to load contributions' },
+  );
+  const [settleTarget, setSettleTarget] = useState<IncentiveContribution | null>(null);
+  const [revertingId, setRevertingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    api.get(`/incentives/schemes/${schemeId}/contributions`, { params: { page, limit: LIMIT, status } })
-      .then((res) => {
-        if (cancelled) return;
-        const data: Paged<IncentiveContribution> = res.data?.data;
-        setItems(data?.items || []);
-        setTotal(data?.total || 0);
-      })
-      .catch((err) => { if (!cancelled) setError(showApiError(err, 'Failed to load contributions') || 'Failed to load contributions'); })
-      .finally(() => { if (!cancelled) setIsLoading(false); });
-    return () => { cancelled = true; };
-  }, [schemeId, page, status, refreshKey]);
-
-  const reload = (fn: () => void) => { setIsLoading(true); setError(null); fn(); };
+  const revert = async (c: IncentiveContribution) => {
+    if (revertingId) return;
+    setRevertingId(c.id);
+    try {
+      await api.post(`/incentives/schemes/${schemeId}/contributions/${c.id}/unsettle`);
+      showApiSuccess('Contribution reverted to pending');
+      onSettled();
+    } catch (err) {
+      showApiError(err, 'Could not revert settlement');
+    } finally {
+      setRevertingId(null);
+    }
+  };
 
   const columns = [
     { key: 'invoice', header: 'Purchase Invoice', render: (c: IncentiveContribution) => <span className="font-medium">{c.purchaseInvoice?.invoiceNo || '—'}</span> },
@@ -372,13 +378,28 @@ function ContributionsTab({ schemeId, type, refreshKey }: { schemeId: string; ty
     { key: 'incentive', header: 'Incentive', className: 'text-right', render: (c: IncentiveContribution) => formatAmount(c.incentiveAmount) },
     { key: 'alt', header: 'Alternate', className: 'text-right', render: (c: IncentiveContribution) => (c.altIncentiveAmount === null ? '—' : formatAmount(c.altIncentiveAmount)) },
     { key: 'lifecycleStatus', header: 'Status', render: (c: IncentiveContribution) => <StatusBadge status={c.lifecycleStatus} /> },
+    {
+      key: 'settlement', header: 'Received',
+      render: (c: IncentiveContribution) => c.settlementStatus === 'SETTLED'
+        ? <div><StatusBadge status="SETTLED" /><p className="mt-0.5 text-xs text-[#7c8591]">{formatAmount(c.settledAmount)}{c.settledAt ? ` · ${formatSchemeDate(c.settledAt)}` : ''}</p></div>
+        : <StatusBadge status="PENDING" />,
+    },
     { key: 'calculatedAt', header: 'Calculated', render: (c: IncentiveContribution) => formatDateTime(c.calculatedAt) },
+    ...(canSettle ? [{
+      key: 'actions', header: '',
+      render: (c: IncentiveContribution) => {
+        if (c.lifecycleStatus !== 'ACTIVE') return null;
+        return c.settlementStatus === 'SETTLED'
+          ? <Button size="sm" variant="outline" disabled={revertingId === c.id} onClick={() => revert(c)}><Undo2 className="mr-1 h-3.5 w-3.5" />{revertingId === c.id ? 'Reverting...' : 'Revert'}</Button>
+          : <Button size="sm" onClick={() => setSettleTarget(c)}><CheckCircle2 className="mr-1 h-3.5 w-3.5" />Mark as Received</Button>;
+      },
+    }] : []),
   ];
 
   return (
     <div className="space-y-3">
       <div className="max-w-[12rem]">
-        <Select value={status} onValueChange={(v) => reload(() => { setStatus(v); setPage(1); })}>
+        <Select value={status} onValueChange={(v) => { setStatus(v); setPage(1); }}>
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>{CONTRIBUTION_STATUSES.map((s) => <SelectItem key={s} value={s}>{s === 'ALL' ? 'All' : humanize(s)}</SelectItem>)}</SelectContent>
         </Select>
@@ -390,35 +411,24 @@ function ContributionsTab({ schemeId, type, refreshKey }: { schemeId: string; ty
       ) : (
         <>
           <DataTable columns={columns} data={items} isLoading={isLoading} />
-          {total > LIMIT && <Pagination page={page} totalPages={Math.ceil(total / LIMIT)} total={total} limit={LIMIT} onPageChange={(p) => reload(() => setPage(p))} />}
+          {total > LIMIT && <Pagination page={page} totalPages={Math.ceil(total / LIMIT)} total={total} limit={LIMIT} onPageChange={setPage} />}
         </>
       )}
+      <SettleContributionDialog
+        open={!!settleTarget}
+        schemeId={schemeId}
+        contribution={settleTarget}
+        onClose={() => setSettleTarget(null)}
+        onSaved={onSettled}
+      />
     </div>
   );
 }
 
 function RunsTab({ schemeId, refreshKey }: { schemeId: string; refreshKey: number }) {
-  const [items, setItems] = useState<IncentiveRun[]>([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    api.get(`/incentives/schemes/${schemeId}/runs`, { params: { page, limit: LIMIT } })
-      .then((res) => {
-        if (cancelled) return;
-        const data: Paged<IncentiveRun> = res.data?.data;
-        setItems(data?.items || []);
-        setTotal(data?.total || 0);
-      })
-      .catch((err) => { if (!cancelled) setError(showApiError(err, 'Failed to load calculation runs') || 'Failed to load calculation runs'); })
-      .finally(() => { if (!cancelled) setIsLoading(false); });
-    return () => { cancelled = true; };
-  }, [schemeId, page, refreshKey]);
-
-  const changePage = (p: number) => { setIsLoading(true); setError(null); setPage(p); };
+  const { items, total, page, setPage, isLoading, error } = usePaginatedList<IncentiveRun>(
+    `/incentives/schemes/${schemeId}/runs`, {}, [schemeId, refreshKey], { limit: LIMIT, errorMessage: 'Failed to load calculation runs' },
+  );
 
   const columns = [
     { key: 'startedAt', header: 'Started', render: (r: IncentiveRun) => formatDateTime(r.startedAt) },
@@ -437,7 +447,7 @@ function RunsTab({ schemeId, refreshKey }: { schemeId: string; refreshKey: numbe
       ) : (
         <>
           <DataTable columns={columns} data={items} isLoading={isLoading} />
-          {total > LIMIT && <Pagination page={page} totalPages={Math.ceil(total / LIMIT)} total={total} limit={LIMIT} onPageChange={changePage} />}
+          {total > LIMIT && <Pagination page={page} totalPages={Math.ceil(total / LIMIT)} total={total} limit={LIMIT} onPageChange={setPage} />}
         </>
       )}
     </div>

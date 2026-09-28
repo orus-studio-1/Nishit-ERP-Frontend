@@ -4,12 +4,13 @@ import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { Plus, Trash2 } from 'lucide-react';
 import api from '@/lib/api';
-import { showApiError, showApiSuccess } from '@/lib/apiError';
+import { useDialogForm } from '@/hooks/useDialogForm';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { MultiSelect } from '@/components/ui/multi-select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SlabFields } from '@/components/incentives/SlabFields';
 import {
@@ -60,46 +61,6 @@ interface SchemeFormDialogProps {
   onSaved: (message?: string) => void;
 }
 
-function ScrollableChecklist({
-  options, value = [], onChange, disabled, searchable, searchPlaceholder = 'Search...'
-}: {
-  options: { id: string; label: string }[];
-  value?: string[];
-  onChange: (v: string[]) => void;
-  disabled?: boolean;
-  searchable?: boolean;
-  searchPlaceholder?: string;
-}) {
-  const [search, setSearch] = useState('');
-  const toggle = (id: string) => onChange(value.includes(id) ? value.filter((x) => x !== id) : [...value, id]);
-  const filtered = searchable && search.trim()
-    ? options.filter((opt) => opt.label.toLowerCase().includes(search.trim().toLowerCase()))
-    : options;
-  return (
-    <div className="space-y-2">
-      {searchable && options.length > 0 ? (
-        <Input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder={searchPlaceholder}
-          disabled={disabled}
-          className="h-8 text-sm"
-        />
-      ) : null}
-      <div className="max-h-40 overflow-y-auto rounded-md border border-[#e5e2dc] p-2 space-y-1">
-        {options.length === 0 ? <p className="text-sm text-[#7c8591]">No items available</p> : null}
-        {options.length > 0 && filtered.length === 0 ? <p className="text-sm text-[#7c8591]">No matches for &quot;{search}&quot;</p> : null}
-        {filtered.map((opt) => (
-          <label key={opt.id} className="flex items-center gap-2 text-sm text-[#374151]">
-            <input type="checkbox" disabled={disabled} checked={value.includes(opt.id)} onChange={() => toggle(opt.id)} />
-            {opt.label}
-          </label>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 // Mount the form only while open so its state starts fresh each time.
 export function SchemeFormDialog(props: SchemeFormDialogProps) {
   return props.open ? <SchemeFormDialogForm {...props} /> : null;
@@ -124,8 +85,8 @@ function schemeToForm(scheme: IncentiveScheme): SchemeForm {
 function SchemeFormDialogForm({ scheme, onClose, onSaved }: SchemeFormDialogProps) {
   const [form, setForm] = useState<SchemeForm>(scheme ? schemeToForm(scheme) : emptyForm);
   const [slabs, setSlabs] = useState<SlabDraft[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  
+  const { isSubmitting, submit: runSubmit } = useDialogForm({ onSaved, onClose });
+
   const [suppliers, setSuppliers] = useState<Array<{ id: string; name: string }>>([]);
   const [products, setProducts] = useState<Array<{ id: string; name: string; sku: string }>>([]);
   const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
@@ -160,8 +121,6 @@ function SchemeFormDialogForm({ scheme, onClose, onSaved }: SchemeFormDialogProp
   }, []);
 
   const set = (patch: Partial<SchemeForm>) => setForm((f) => ({ ...f, ...patch }));
-  const toggleTradeType = (t: TradeType) =>
-    set({ eligibleTradeTypes: form.eligibleTradeTypes.includes(t) ? form.eligibleTradeTypes.filter((x) => x !== t) : [...form.eligibleTradeTypes, t] });
 
   const validate = (): string | null => {
     if (!form.name.trim()) return 'Scheme name is required';
@@ -182,53 +141,40 @@ function SchemeFormDialogForm({ scheme, onClose, onSaved }: SchemeFormDialogProp
     return null;
   };
 
-  const submit = async (e: React.FormEvent) => {
+  const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSubmitting) return;
     const problem = validate();
     if (problem) { toast.error(problem); return; }
-    setIsSubmitting(true);
-    try {
-      const payload = {
-        name: form.name.trim(),
-        code: form.code.trim() || null,
-        manufacturerLabel: form.manufacturerLabel.trim(),
-        description: form.description.trim() || null,
-        bookingChannel: form.bookingChannel.trim() || null,
-        startDate: form.startDate,
-        endDate: form.endDate,
-        measurementType: form.measurementType,
-        amountBasis: form.amountBasis,
-        slabMode: form.slabMode,
-        allowAnyTradeType: form.allowAnyTradeType,
-        eligibleTradeTypes: form.allowAnyTradeType ? [] : form.eligibleTradeTypes,
-        allowAnySupplier: form.allowAnySupplier,
-        eligibleSupplierIds: form.allowAnySupplier ? [] : form.eligibleSupplierIds,
-        rewardExcludedProductIds: form.rewardExcludedProductIds,
-        includedCategoryIds: form.includedCategoryIds,
-        returnHandling: form.returnHandling,
-        paymentConditionDays: form.paymentConditionDays.trim() ? Number(form.paymentConditionDays) : null,
-        minInvoiceValue: form.minInvoiceValue.trim() ? Number(form.minInvoiceValue) : null,
-        eligibilityDateBasis: form.eligibilityDateBasis,
-        autoCalculate: form.autoCalculate,
-        allowAnyBranch: form.allowAnyBranch,
-        eligibleBranchIds: form.allowAnyBranch ? [] : form.eligibleBranchIds,
-      };
-      if (scheme) {
-        const res = await api.put(`/incentives/schemes/${scheme.id}`, payload);
-        showApiSuccess(res.data?.message || 'Incentive scheme updated');
-        onSaved(res.data?.message);
-      } else {
-        await api.post('/incentives/schemes', { ...payload, slabs: slabs.map(slabDraftPayload) });
-        showApiSuccess('Incentive scheme created');
-        onSaved();
-      }
-      onClose();
-    } catch (err) {
-      showApiError(err, scheme ? 'Failed to update scheme' : 'Failed to create scheme');
-    } finally {
-      setIsSubmitting(false);
-    }
+    const payload = {
+      name: form.name.trim(),
+      code: form.code.trim() || null,
+      manufacturerLabel: form.manufacturerLabel.trim(),
+      description: form.description.trim() || null,
+      bookingChannel: form.bookingChannel.trim() || null,
+      startDate: form.startDate,
+      endDate: form.endDate,
+      measurementType: form.measurementType,
+      amountBasis: form.amountBasis,
+      slabMode: form.slabMode,
+      allowAnyTradeType: form.allowAnyTradeType,
+      eligibleTradeTypes: form.allowAnyTradeType ? [] : form.eligibleTradeTypes,
+      allowAnySupplier: form.allowAnySupplier,
+      eligibleSupplierIds: form.allowAnySupplier ? [] : form.eligibleSupplierIds,
+      rewardExcludedProductIds: form.rewardExcludedProductIds,
+      includedCategoryIds: form.includedCategoryIds,
+      returnHandling: form.returnHandling,
+      paymentConditionDays: form.paymentConditionDays.trim() ? Number(form.paymentConditionDays) : null,
+      minInvoiceValue: form.minInvoiceValue.trim() ? Number(form.minInvoiceValue) : null,
+      eligibilityDateBasis: form.eligibilityDateBasis,
+      autoCalculate: form.autoCalculate,
+      allowAnyBranch: form.allowAnyBranch,
+      eligibleBranchIds: form.allowAnyBranch ? [] : form.eligibleBranchIds,
+    };
+    void runSubmit(
+      () => (scheme ? api.put(`/incentives/schemes/${scheme.id}`, payload) : api.post('/incentives/schemes', { ...payload, slabs: slabs.map(slabDraftPayload) })),
+      scheme ? 'Incentive scheme updated' : 'Incentive scheme created',
+      scheme ? 'Failed to update scheme' : 'Failed to create scheme',
+    );
   };
 
   return (
@@ -323,14 +269,13 @@ function SchemeFormDialogForm({ scheme, onClose, onSaved }: SchemeFormDialogProp
               <input type="checkbox" checked={form.allowAnyTradeType} onChange={(e) => set({ allowAnyTradeType: e.target.checked })} />
               Allow any trade type (ignores the list below)
             </label>
-            <div className="flex flex-wrap gap-x-4 gap-y-2">
-              {TRADE_TYPES.map((t) => (
-                <label key={t} className="flex items-center gap-2 text-sm text-[#374151]">
-                  <input type="checkbox" disabled={form.allowAnyTradeType} checked={form.eligibleTradeTypes.includes(t)} onChange={() => toggleTradeType(t)} />
-                  {humanize(t)}
-                </label>
-              ))}
-            </div>
+            <MultiSelect
+              disabled={form.allowAnyTradeType}
+              placeholder="Select trade types…"
+              options={TRADE_TYPES.map((t) => ({ value: t, label: humanize(t) }))}
+              value={form.eligibleTradeTypes}
+              onChange={(v) => set({ eligibleTradeTypes: v as TradeType[] })}
+            />
           </div>
 
           <div className="space-y-2 sm:col-span-2">
@@ -339,9 +284,10 @@ function SchemeFormDialogForm({ scheme, onClose, onSaved }: SchemeFormDialogProp
               <input type="checkbox" checked={form.allowAnySupplier} onChange={(e) => set({ allowAnySupplier: e.target.checked })} />
               Allow any supplier
             </label>
-            <ScrollableChecklist
+            <MultiSelect
               disabled={form.allowAnySupplier}
-              options={suppliers.map(s => ({ id: s.id, label: s.name }))}
+              placeholder="Select suppliers…"
+              options={suppliers.map(s => ({ value: s.id, label: s.name }))}
               value={form.eligibleSupplierIds}
               onChange={(v) => set({ eligibleSupplierIds: v })}
             />
@@ -350,10 +296,10 @@ function SchemeFormDialogForm({ scheme, onClose, onSaved }: SchemeFormDialogProp
           <div className="space-y-2 sm:col-span-2">
             <Label>Products excluded from reward</Label>
             <p className="text-xs text-[#7c8591]">These products count towards the slab threshold, but earn no reward amount.</p>
-            <ScrollableChecklist
-              searchable
-              searchPlaceholder="Search products..."
-              options={products.map(p => ({ id: p.id, label: `${p.name} (${p.sku})` }))}
+            <MultiSelect
+              placeholder="Select products…"
+              searchPlaceholder="Search products…"
+              options={products.map(p => ({ value: p.id, label: `${p.name} (${p.sku})` }))}
               value={form.rewardExcludedProductIds}
               onChange={(v) => set({ rewardExcludedProductIds: v })}
             />
@@ -362,8 +308,9 @@ function SchemeFormDialogForm({ scheme, onClose, onSaved }: SchemeFormDialogProp
           <div className="space-y-4 pt-4 border-t sm:col-span-2">
             <h4 className="text-sm font-medium">Eligible Categories</h4>
             <p className="text-xs text-[#7c8591]">If any categories are selected, ONLY products from these categories will be eligible.</p>
-            <ScrollableChecklist
-              options={categories.map(c => ({ id: c.id, label: c.name }))}
+            <MultiSelect
+              placeholder="Select categories…"
+              options={categories.map(c => ({ value: c.id, label: c.name }))}
               value={form.includedCategoryIds || []}
               onChange={(v) => set({ includedCategoryIds: v })}
             />
@@ -375,9 +322,10 @@ function SchemeFormDialogForm({ scheme, onClose, onSaved }: SchemeFormDialogProp
               <input type="checkbox" checked={form.allowAnyBranch} onChange={(e) => set({ allowAnyBranch: e.target.checked })} />
               Allow any branch
             </label>
-            <ScrollableChecklist
+            <MultiSelect
               disabled={form.allowAnyBranch}
-              options={branches.map(b => ({ id: b.id, label: b.name }))}
+              placeholder="Select branches…"
+              options={branches.map(b => ({ value: b.id, label: b.name }))}
               value={form.eligibleBranchIds}
               onChange={(v) => set({ eligibleBranchIds: v })}
             />

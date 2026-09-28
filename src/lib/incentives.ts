@@ -88,7 +88,7 @@ export interface SlabView {
 export interface SchemeSummary {
   scheme: Pick<IncentiveScheme, 'id' | 'name' | 'code' | 'manufacturerLabel' | 'status' | 'measurementType' | 'slabMode' | 'allowAnyTradeType' | 'eligibleTradeTypes' | 'amountBasis' | 'allowAnySupplier' | 'eligibleSupplierIds' | 'rewardExcludedProductIds' | 'startDate' | 'endDate'>;
   achievement: { eligibleValue: string; eligibleQuantity: string; activeContributions: number };
-  incentive: { primaryAmount: string; alternateAmount: string | null; note: string };
+  incentive: { primaryAmount: string; alternateAmount: string | null; note: string; settledAmount: string; settledCount: number; pendingCount: number };
   progress: {
     currentSlab: SlabView | null;
     nextSlab: SlabView | null;
@@ -115,6 +115,8 @@ export interface CalculationResult {
   contributionsSuperseded: number;
 }
 
+export type SettlementStatus = 'PENDING' | 'SETTLED';
+
 export interface IncentiveContribution {
   id: string;
   purchaseInvoiceId: string;
@@ -127,6 +129,11 @@ export interface IncentiveContribution {
   lifecycleStatus: 'ACTIVE' | 'SUPERSEDED' | 'REVERSED';
   purchaseInvoice: { id: string; invoiceNo: string; date: string; tradeType: TradeType | null } | null;
   lines: Array<{ id: string; quantity: string; eligibleValue: string }>;
+  settlementStatus: SettlementStatus;
+  settledAmount: string | null;
+  settledAt: string | null;
+  settledReference: string | null;
+  settlementNotes: string | null;
 }
 
 export interface IncentiveRun {
