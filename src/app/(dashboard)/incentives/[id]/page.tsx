@@ -285,8 +285,6 @@ export default function IncentiveSchemeDetailPage() {
               
               <Field label="Min invoice value">{scheme.minInvoiceValue ? formatAmount(scheme.minInvoiceValue) : '—'}</Field>
               <Field label="Payment terms limit">{scheme.paymentConditionDays ? `${scheme.paymentConditionDays} days` : '—'}</Field>
-              <Field label="Maximum incentive cap">{scheme.maximumIncentiveCap ? formatAmount(scheme.maximumIncentiveCap) : '—'}</Field>
-              <Field label="Baseline volume">{scheme.baselineVolume ? formatAmount(scheme.baselineVolume) : '—'}</Field>
               <Field label="Booking channel">{scheme.bookingChannel || '—'}</Field>
               <Field label="Eligible trade types">{scheme.allowAnyTradeType ? 'Any trade type' : scheme.eligibleTradeTypes.map(humanize).join(', ') || '—'}</Field>
               
@@ -304,14 +302,6 @@ export default function IncentiveSchemeDetailPage() {
                 {(scheme.includedCategoryIds?.length ?? 0) > 0
                   ? scheme.includedCategoryIds!.map(cid => categories.find(c => c.id === cid)?.name || cid).join(', ')
                   : 'All categories'}
-              </Field>
-              <Field label="Eligible products (Whitelist)">
-                {(scheme.includedProductIds?.length ?? 0) > 0
-                  ? scheme.includedProductIds!.map(pid => {
-                      const p = products.find(x => x.id === pid);
-                      return p ? `${p.name} (${p.sku})` : pid;
-                    }).join(', ')
-                  : 'Any product within selected categories'}
               </Field>
               <Field label="Reward excluded products">
                 {(scheme.rewardExcludedProductIds?.length ?? 0) > 0 

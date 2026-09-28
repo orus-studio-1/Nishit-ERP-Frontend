@@ -35,13 +35,10 @@ interface SchemeForm {
   allowAnySupplier: boolean;
   eligibleSupplierIds: string[];
   rewardExcludedProductIds: string[];
-  includedProductIds: string[];
   includedCategoryIds: string[];
   returnHandling: ReturnHandlingMode;
   paymentConditionDays: string;
   minInvoiceValue: string;
-  maximumIncentiveCap: string;
-  baselineVolume: string;
   eligibilityDateBasis: DateBasisMode;
   autoCalculate: AutoCalculateMode;
   eligibleBranchIds: string[];
@@ -51,9 +48,8 @@ interface SchemeForm {
 const emptyForm: SchemeForm = {
   name: '', code: '', manufacturerLabel: '', description: '', bookingChannel: '', startDate: '', endDate: '',
   measurementType: 'VALUE', amountBasis: 'PRE_TAX_BEFORE_DISCOUNT', slabMode: 'HIGHEST_SLAB_WINS', allowAnyTradeType: false, eligibleTradeTypes: [],
-  allowAnySupplier: false, eligibleSupplierIds: [], rewardExcludedProductIds: [], includedProductIds: [],
-  includedCategoryIds: [], returnHandling: 'IGNORE_RETURNS', paymentConditionDays: '', minInvoiceValue: '', 
-  maximumIncentiveCap: '', baselineVolume: '',
+  allowAnySupplier: false, eligibleSupplierIds: [], rewardExcludedProductIds: [],
+  includedCategoryIds: [], returnHandling: 'IGNORE_RETURNS', paymentConditionDays: '', minInvoiceValue: '',
   eligibilityDateBasis: 'INVOICE_DATE', autoCalculate: 'MANUAL', eligibleBranchIds: [], allowAnyBranch: true,
 };
 
@@ -116,12 +112,10 @@ function schemeToForm(scheme: IncentiveScheme): SchemeForm {
     startDate: toDateInput(scheme.startDate), endDate: toDateInput(scheme.endDate),
     measurementType: scheme.measurementType, amountBasis: scheme.amountBasis, slabMode: scheme.slabMode,
     allowAnyTradeType: scheme.allowAnyTradeType, eligibleTradeTypes: scheme.eligibleTradeTypes,
-    allowAnySupplier: scheme.allowAnySupplier, eligibleSupplierIds: scheme.eligibleSupplierIds, rewardExcludedProductIds: scheme.rewardExcludedProductIds ?? [], includedProductIds: scheme.includedProductIds ?? [],
+    allowAnySupplier: scheme.allowAnySupplier, eligibleSupplierIds: scheme.eligibleSupplierIds, rewardExcludedProductIds: scheme.rewardExcludedProductIds ?? [],
     includedCategoryIds: scheme.includedCategoryIds ?? [], returnHandling: scheme.returnHandling ?? 'IGNORE_RETURNS',
     paymentConditionDays: scheme.paymentConditionDays !== null && scheme.paymentConditionDays !== undefined ? String(scheme.paymentConditionDays) : '',
     minInvoiceValue: scheme.minInvoiceValue ? String(scheme.minInvoiceValue) : '',
-    maximumIncentiveCap: scheme.maximumIncentiveCap ? String(scheme.maximumIncentiveCap) : '',
-    baselineVolume: scheme.baselineVolume ? String(scheme.baselineVolume) : '',
     eligibilityDateBasis: scheme.eligibilityDateBasis ?? 'INVOICE_DATE', autoCalculate: scheme.autoCalculate,
     eligibleBranchIds: scheme.eligibleBranchIds, allowAnyBranch: scheme.allowAnyBranch,
   };
@@ -211,13 +205,10 @@ function SchemeFormDialogForm({ scheme, onClose, onSaved }: SchemeFormDialogProp
         allowAnySupplier: form.allowAnySupplier,
         eligibleSupplierIds: form.allowAnySupplier ? [] : form.eligibleSupplierIds,
         rewardExcludedProductIds: form.rewardExcludedProductIds,
-        includedProductIds: form.includedProductIds,
         includedCategoryIds: form.includedCategoryIds,
         returnHandling: form.returnHandling,
         paymentConditionDays: form.paymentConditionDays.trim() ? Number(form.paymentConditionDays) : null,
         minInvoiceValue: form.minInvoiceValue.trim() ? Number(form.minInvoiceValue) : null,
-        maximumIncentiveCap: form.maximumIncentiveCap.trim() ? Number(form.maximumIncentiveCap) : null,
-        baselineVolume: form.baselineVolume.trim() ? Number(form.baselineVolume) : null,
         eligibilityDateBasis: form.eligibilityDateBasis,
         autoCalculate: form.autoCalculate,
         allowAnyBranch: form.allowAnyBranch,
@@ -320,14 +311,6 @@ function SchemeFormDialogForm({ scheme, onClose, onSaved }: SchemeFormDialogProp
             <Label>Payment Terms Condition (Days)</Label>
             <Input type="number" min="0" value={form.paymentConditionDays} onChange={(e) => set({ paymentConditionDays: e.target.value })} placeholder="e.g. 30" />
           </div>
-          <div className="space-y-1.5">
-            <Label>Maximum Incentive Cap (₹)</Label>
-            <Input type="number" min="0" value={form.maximumIncentiveCap} onChange={(e) => set({ maximumIncentiveCap: e.target.value })} placeholder="Optional" />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Baseline Volume</Label>
-            <Input type="number" min="0" value={form.baselineVolume} onChange={(e) => set({ baselineVolume: e.target.value })} placeholder="Optional" />
-          </div>
 
           <div className="space-y-1.5 sm:col-span-2">
             <Label>Description</Label>
@@ -383,18 +366,6 @@ function SchemeFormDialogForm({ scheme, onClose, onSaved }: SchemeFormDialogProp
               options={categories.map(c => ({ id: c.id, label: c.name }))}
               value={form.includedCategoryIds || []}
               onChange={(v) => set({ includedCategoryIds: v })}
-            />
-          </div>
-
-          <div className="space-y-4 pt-4 border-t sm:col-span-2">
-            <h4 className="text-sm font-medium">Eligible Products (Whitelist)</h4>
-            <p className="text-xs text-[#7c8591]">If any products are selected, ONLY these specific products will be eligible. (Applies on top of category filters).</p>
-            <ScrollableChecklist
-              searchable
-              searchPlaceholder="Search products..."
-              options={products.map(p => ({ id: p.id, label: `${p.name} (${p.sku})` }))}
-              value={form.includedProductIds || []}
-              onChange={(v) => set({ includedProductIds: v })}
             />
           </div>
 

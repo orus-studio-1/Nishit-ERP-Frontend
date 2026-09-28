@@ -63,15 +63,12 @@ export interface IncentiveScheme {
   bookingChannel: string | null;
   status: SchemeStatus;
   
-  // Phase 3 & 4 Configuration
-  includedProductIds?: string[];
+  // Eligibility and calculation configuration (only fields the backend actually persists and uses).
   rewardExcludedProductIds?: string[];
   includedCategoryIds?: string[];
   returnHandling?: ReturnHandlingMode;
   paymentConditionDays?: number | null;
   minInvoiceValue?: string | number | null;
-  maximumIncentiveCap?: string | number | null;
-  baselineVolume?: string | number | null;
   eligibilityDateBasis?: DateBasisMode;
   autoCalculate: AutoCalculateMode;
   eligibleBranchIds: string[];
