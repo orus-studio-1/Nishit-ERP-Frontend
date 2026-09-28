@@ -1368,8 +1368,10 @@ function payloadFor(kind: ProcurementKind, form: any, lines: any[]) {
       : {
         ...form,
         supplierId: form.supplierId,
-        items: lines.map((line) => ({
+        warehouseId: form.warehouseId,
+        items: lines.filter((l: any) => l.productId).map((line) => ({
           ...line,
+          warehouseId: form.warehouseId,
           receivedQty: line.quantity,
           acceptedQty: line.quantity,
           rate: line.unitPrice || line.rate,
