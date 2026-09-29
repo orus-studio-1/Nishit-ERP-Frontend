@@ -1500,7 +1500,7 @@ function columnsFor(kind: ProcurementKind, status: (id: string, value: string) =
       { key: 'rejectedQty', header: 'Rejected' },
     ];
   return [
-    { key: 'agreementNo', header: 'Agreement #' },
+    { key: 'agreementNo', header: 'Agreement #', render: (r: any) => <Link href={`/procurement/blanket-purchase-orders/${r.id}`} className="font-mono font-semibold text-blue-600 hover:underline">{r.agreementNo}</Link> },
     { key: 'supplier', header: 'Supplier', render: (r: any) => r.supplier?.name },
     { key: 'status', header: 'Status', render: (r: any) => <StatusBadge status={r.status} /> },
     { key: 'validFrom', header: 'Valid From', render: (r: any) => formatDate(r.validFrom) },
