@@ -8,7 +8,7 @@ import {
   ChartColumnIncreasing, ArchiveX, UserRound, Building, Target, Activity,
   Route, Upload, FileCheck2, ClipboardSignature, CalendarCheck, CalendarCog, CalendarX,
   ListChecks, HandCoins, BadgeDollarSign, Wallet, UserCog, SlidersHorizontal, KeyRound,
-  Handshake, Scale, PackageCheck, History
+  Handshake, Scale, PackageCheck, History, BadgePercent
 } from 'lucide-react';
 
 export interface NavItem {
@@ -146,6 +146,12 @@ export const navItems: NavItem[] = [
       { label: 'Procurement Reports', href: '/procurement/reports', icon: ChartColumnIncreasing, permission: 'procurement:reports:read' },
       { label: 'Procurement Audit Trail', href: '/procurement/audit-trail', icon: History, permission: 'access:audit:read' },
       { label: 'Buying Settings', href: '/procurement/settings', icon: Settings, permission: 'procurement:settings:read' },
+    ],
+  },
+  {
+    label: 'Incentives', icon: BadgePercent,
+    children: [
+      { label: 'Incentive Schemes', href: '/incentives', icon: BadgePercent, permission: 'incentives:schemes:read' },
     ],
   },
   { label: 'Projects', href: '/projects', icon: FolderOpen, permission: 'projects:projects:read' },
