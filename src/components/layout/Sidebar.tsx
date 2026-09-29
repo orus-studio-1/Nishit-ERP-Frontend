@@ -13,14 +13,36 @@ interface SidebarProps {
   onClose?: () => void;
 }
 
-function NavItemComponent({ item, depth = 0 }: { item: NavItem; depth?: number }) {
+/**
+ * Picks the single most specific nav href that matches the current path, so sibling items whose
+ * href is a prefix of another item's href (e.g. "/settings" vs "/settings/tally") don't both
+ * light up: only the longest matching href wins.
+ */
+function findActiveHref(items: NavItem[], pathname: string): string | undefined {
+  let best: string | undefined;
+  const consider = (href?: string) => {
+    if (!href) return;
+    const matches = href === pathname || (href !== '/dashboard' && pathname.startsWith(`${href}/`));
+    if (matches && (!best || href.length > best.length)) best = href;
+  };
+  const walk = (list: NavItem[]) => {
+    for (const item of list) {
+      consider(item.href);
+      if (item.children) walk(item.children);
+    }
+  };
+  walk(items);
+  return best;
+}
+
+function NavItemComponent({ item, activeHref, depth = 0 }: { item: NavItem; activeHref?: string; depth?: number }) {
   const pathname = usePathname();
   const [isExpanded, setIsExpanded] = useState(() => {
     if (!item.children) return false;
     return item.children.some(child => child.href === pathname || pathname.startsWith(child.href || ''));
   });
 
-  const isActive = item.href === pathname || (item.href && item.href !== '/dashboard' && pathname.startsWith(item.href));
+  const isActive = Boolean(item.href) && item.href === activeHref;
 
   if (item.children) {
     return (
@@ -42,7 +64,7 @@ function NavItemComponent({ item, depth = 0 }: { item: NavItem; depth?: number }
         {isExpanded && (
           <div className="ml-4 mt-1 space-y-0.5 border-l border-[#e5e2dc] pl-2">
             {item.children.map((child) => (
-              <NavItemComponent key={child.label} item={child} depth={depth + 1} />
+              <NavItemComponent key={child.label} item={child} activeHref={activeHref} depth={depth + 1} />
             ))}
           </div>
         )}
@@ -69,6 +91,8 @@ function NavItemComponent({ item, depth = 0 }: { item: NavItem; depth?: number }
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { user } = useAuth();
+  const pathname = usePathname();
+  const activeHref = findActiveHref(navItems, pathname);
   const canSee = (item: NavItem): boolean => {
     if (!user?.access || user.access.isSuperAdmin) return true;
     if (item.children) return item.children.some(canSee);
@@ -110,7 +134,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-3">
           {visibleItems.map((item) => (
-            <NavItemComponent key={item.label} item={item} />
+            <NavItemComponent key={item.label} item={item} activeHref={activeHref} />
           ))}
         </nav>
 

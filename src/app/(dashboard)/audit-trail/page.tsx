@@ -23,6 +23,34 @@ const actions = ['CREATE', 'UPDATE', 'DELETE', 'SUBMIT', 'CANCEL', 'AMEND', 'APP
 const actorName = (actor?: Actor | null) => actor ? `${actor.firstName || ''} ${actor.lastName || ''}`.trim() || actor.email : 'System';
 const pretty = (value: unknown) => JSON.stringify(value ?? {}, null, 2);
 
+const fieldLabel = (key: string) => key.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/^./, char => char.toUpperCase());
+const looksLikeDate = (key: string, value: string) => /(date|at)$/i.test(key) && !Number.isNaN(Date.parse(value));
+const formatScalar = (key: string, value: unknown): string => {
+  if (value === null || value === undefined || value === '') return '—';
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (typeof value === 'number') return Number.isInteger(value) ? value.toLocaleString('en-IN') : value.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+  if (typeof value === 'string' && looksLikeDate(key, value)) return new Date(value).toLocaleString('en-IN');
+  return String(value);
+};
+
+// Renders a flat object as a readable field/value grid; nested objects/arrays fall back to inline JSON
+// since audit diffs are usually one level of scalars (line items are the exception).
+function FieldGrid({ value }: { value: unknown }) {
+  if (value == null || typeof value !== 'object' || Array.isArray(value)) {
+    return <pre className="mt-1 max-h-72 overflow-auto rounded-lg bg-gray-950 p-4 text-xs text-gray-100">{pretty(value)}</pre>;
+  }
+  const entries = Object.entries(value as Record<string, unknown>);
+  if (!entries.length) return <p className="mt-1 text-sm text-gray-500">No fields recorded.</p>;
+  return <div className="mt-1 grid gap-x-6 gap-y-2 rounded-lg border bg-white p-3 sm:grid-cols-2">
+    {entries.map(([key, val]) => <div key={key} className="min-w-0">
+      <p className="text-xs text-gray-500">{fieldLabel(key)}</p>
+      {val !== null && typeof val === 'object'
+        ? <p className="truncate font-mono text-xs text-gray-700" title={pretty(val)}>{Array.isArray(val) ? `${val.length} item(s)` : 'Nested object'}</p>
+        : <p className="break-words text-sm font-medium text-gray-900">{formatScalar(key, val)}</p>}
+    </div>)}
+  </div>;
+}
+
 function AuditTrailContent() {
   const searchParams = useSearchParams();
   const [rows, setRows] = useState<AuditRow[]>([]);
@@ -76,7 +104,7 @@ function AuditTrailContent() {
       <div className="space-y-1"><Label>Record ID</Label><Input placeholder="Exact record ID" value={filters.entityId} onChange={event => setFilter('entityId', event.target.value)} /></div>
     </div>
     {!rows.length && !loading ? <EmptyState icon={History} title="No audit activity found" description="Successful changes made by employees will appear here. Try clearing the filters if activity already exists." /> : <><DataTable data={rows} columns={columns} isLoading={loading} />{total > limit && <Pagination page={page} totalPages={totalPages} total={total} limit={limit} onPageChange={setPage} />}</>}
-    <Dialog open={!!selected} onOpenChange={open => !open && setSelected(null)}><DialogContent className="max-h-[85vh] max-w-4xl overflow-y-auto"><DialogHeader><DialogTitle>Audit Event Details</DialogTitle></DialogHeader>{selected && <div className="space-y-4 text-sm"><div className="grid gap-3 rounded-lg border bg-gray-50 p-4 sm:grid-cols-2"><p><span className="text-gray-500">Employee:</span> {actorName(selected.actor)} ({selected.actor?.email || 'system'})</p><p><span className="text-gray-500">Action:</span> {selected.action}</p><p><span className="text-gray-500">Record:</span> {selected.entityType} · {selected.entityId || 'multiple'}</p><p><span className="text-gray-500">Time:</span> {new Date(selected.createdAt).toLocaleString()}</p><p><span className="text-gray-500">IP:</span> {selected.ip || '—'}</p><p><span className="text-gray-500">Request ID:</span> <span className="font-mono text-xs">{selected.requestId || '—'}</span></p></div>{selected.before != null && <div><Label>Previous values</Label><pre className="mt-1 max-h-72 overflow-auto rounded-lg bg-gray-950 p-4 text-xs text-gray-100">{pretty(selected.before)}</pre></div>}<div><Label>Fields submitted / changed</Label><pre className="mt-1 max-h-72 overflow-auto rounded-lg bg-gray-950 p-4 text-xs text-gray-100">{pretty(selected.diff)}</pre></div><div><Label>Saved result</Label><pre className="mt-1 max-h-72 overflow-auto rounded-lg bg-gray-950 p-4 text-xs text-gray-100">{pretty(selected.after)}</pre></div></div>}</DialogContent></Dialog>
+    <Dialog open={!!selected} onOpenChange={open => !open && setSelected(null)}><DialogContent className="max-h-[85vh] max-w-4xl overflow-y-auto"><DialogHeader><DialogTitle>Audit Event Details</DialogTitle></DialogHeader>{selected && <div className="space-y-4 text-sm"><div className="grid gap-3 rounded-lg border bg-gray-50 p-4 sm:grid-cols-2"><p><span className="text-gray-500">Employee:</span> {actorName(selected.actor)} ({selected.actor?.email || 'system'})</p><p><span className="text-gray-500">Action:</span> {selected.action}</p><p><span className="text-gray-500">Record:</span> {selected.entityType} · {selected.entityId || 'multiple'}</p><p><span className="text-gray-500">Time:</span> {new Date(selected.createdAt).toLocaleString()}</p><p><span className="text-gray-500">IP:</span> {selected.ip || '—'}</p><p><span className="text-gray-500">Request ID:</span> <span className="font-mono text-xs">{selected.requestId || '—'}</span></p></div>{selected.before != null && <div><Label>Previous values</Label><FieldGrid value={selected.before} /></div>}<div><Label>Fields submitted / changed</Label><FieldGrid value={selected.diff} /></div><div><Label>Saved result</Label><FieldGrid value={selected.after} /></div></div>}</DialogContent></Dialog>
   </div>;
 }
 

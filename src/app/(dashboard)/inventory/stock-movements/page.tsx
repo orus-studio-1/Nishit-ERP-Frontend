@@ -42,6 +42,8 @@ export default function StockMovementsPage() {
     serialNo: '',
     notes: '',
     reference: '',
+    batchNo: '',
+    serialNo: '',
   });
   const limit = 20;
 
@@ -87,7 +89,22 @@ export default function StockMovementsPage() {
 
     setIsSubmitting(true);
     try {
-      await api.post('/inventory/stock-movements', { ...form, quantity: Number(form.quantity) });
+      const selectedProduct = products.find((p) => p.id === form.productId);
+      const payload: Record<string, any> = {
+        productId: form.productId,
+        warehouseId: form.warehouseId,
+        type: form.type,
+        quantity: Number(form.quantity),
+        notes: form.notes || undefined,
+        reference: form.reference || undefined,
+      };
+      if (selectedProduct?.hasBatchNo && form.batchNo.trim()) {
+        payload.batchNo = form.batchNo.trim();
+      }
+      if (selectedProduct?.hasSerialNo && form.serialNo.trim()) {
+        payload.serialNo = form.serialNo.trim();
+      }
+      await api.post('/inventory/stock-movements', payload);
       showApiSuccess('Stock movement recorded successfully');
       setShowModal(false);
       setForm({ productId: '', warehouseId: '', type: 'IN', quantity: '', batchNo: '', serialNo: '', notes: '', reference: '' });
@@ -254,6 +271,31 @@ export default function StockMovementsPage() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Batch Number — shown when selected product has hasBatchNo */}
+            {products.find((p) => p.id === form.productId)?.hasBatchNo && (
+              <div className="space-y-1.5">
+                <Label>Batch Number</Label>
+                <Input
+                  value={form.batchNo}
+                  onChange={(e) => setForm((f) => ({ ...f, batchNo: e.target.value }))}
+                  placeholder="e.g. BATCH-2026-001"
+                />
+              </div>
+            )}
+
+            {/* Serial Number — shown when selected product has hasSerialNo */}
+            {products.find((p) => p.id === form.productId)?.hasSerialNo && (
+              <div className="space-y-1.5">
+                <Label>Serial Number</Label>
+                <Input
+                  value={form.serialNo}
+                  onChange={(e) => setForm((f) => ({ ...f, serialNo: e.target.value }))}
+                  placeholder="Enter serial number"
+                />
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Type *</Label>
