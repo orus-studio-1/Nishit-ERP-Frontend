@@ -38,6 +38,8 @@ export default function StockMovementsPage() {
     warehouseId: '',
     type: 'IN',
     quantity: '',
+    batchNo: '',
+    serialNo: '',
     notes: '',
     reference: '',
     batchNo: '',
@@ -105,7 +107,7 @@ export default function StockMovementsPage() {
       await api.post('/inventory/stock-movements', payload);
       showApiSuccess('Stock movement recorded successfully');
       setShowModal(false);
-      setForm({ productId: '', warehouseId: '', type: 'IN', quantity: '', notes: '', reference: '', batchNo: '', serialNo: '' });
+      setForm({ productId: '', warehouseId: '', type: 'IN', quantity: '', batchNo: '', serialNo: '', notes: '', reference: '' });
       fetchAll();
     } catch (err: any) {
       showApiError(err, 'Failed to record stock movement');
@@ -319,6 +321,24 @@ export default function StockMovementsPage() {
                   value={form.quantity}
                   onChange={(e) => setForm((f) => ({ ...f, quantity: e.target.value }))}
                   required
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Batch Number</Label>
+                <Input
+                  value={form.batchNo}
+                  onChange={(e) => setForm((f) => ({ ...f, batchNo: e.target.value }))}
+                  placeholder="e.g. BATCH-001"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Serial Number</Label>
+                <Input
+                  value={form.serialNo}
+                  onChange={(e) => setForm((f) => ({ ...f, serialNo: e.target.value }))}
+                  placeholder="Optional"
                 />
               </div>
             </div>

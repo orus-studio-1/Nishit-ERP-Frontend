@@ -175,6 +175,7 @@ export function ProcurementPage({ kind }: { kind: ProcurementKind }) {
   const [lines, setLines] = useState<any[]>([blankLine]);
   const [poOperation, setPoOperation] = useState<{ row: any; operation: 'dispatch' | 'receive-goods' | 'delay-follow-up' } | null>(null);
   const [poOperationForm, setPoOperationForm] = useState<any>({});
+  const [editRow, setEditRow] = useState<any>(null); // for edit modal
 
   async function load() {
     setLoading(true);
@@ -257,9 +258,15 @@ export function ProcurementPage({ kind }: { kind: ProcurementKind }) {
 
     setSubmitting(true);
     try {
-      await api.post(meta.endpoint, payloadFor(kind, form, lines));
-      showApiSuccess(`${meta.title.replace(/s$/, '')} created successfully`);
+      if (editRow) {
+        await api.put(`${meta.endpoint}/${editRow.id}`, payloadFor(kind, form, lines));
+        showApiSuccess(`${meta.title.replace(/s$/, '')} updated successfully`);
+      } else {
+        await api.post(meta.endpoint, payloadFor(kind, form, lines));
+        showApiSuccess(`${meta.title.replace(/s$/, '')} created successfully`);
+      }
       setOpen(false);
+      setEditRow(null);
       setForm(defaultForm(kind));
       setLines([blankLine]);
       load();
@@ -286,6 +293,39 @@ export function ProcurementPage({ kind }: { kind: ProcurementKind }) {
     if (['dispatch', 'receive-goods', 'delay-follow-up'].includes(operation)) {
       setPoOperation({ row, operation: operation as any });
       setPoOperationForm(operation === 'receive-goods' ? { warehouseId: '', vehicleNo: '', challanNo: '', invoiceReference: '' } : operation === 'dispatch' ? { trackingReference: '', carrier: row.carrier || '', estimatedArrivalAt: '' } : { reason: '', estimatedArrivalAt: '' });
+      return;
+    }
+    // Handle payment-terms edit/delete
+    if (kind === 'payment-terms') {
+      if (operation === 'edit-pt') {
+        setEditRow(row);
+        setForm({ name: row.name || '', description: row.description || '', isActive: row.isActive !== false });
+        setLines((row.terms || []).map((t: any) => ({ label: t.label, percentage: t.percentage, dueAfterDays: t.dueAfterDays || 0 })));
+        setOpen(true);
+      } else if (operation === 'delete-pt') {
+        if (!confirm('Delete this payment term template?')) return;
+        try {
+          await api.delete(`/procurement/payment-terms/${row.id}`);
+          showApiSuccess('Payment terms deleted');
+          load();
+        } catch (err: any) { showApiError(err, 'Delete failed'); }
+      }
+      return;
+    }
+    // Handle supplier-quotation operations
+    if (kind === 'supplier-quotations') {
+      try {
+        if (operation === 'submit') {
+          await api.post(`/procurement/supplier-quotations/${row.id}/lifecycle/submit`);
+          showApiSuccess('Supplier quotation submitted');
+        } else if (operation === 'create-po') {
+          await api.post(`/procurement/supplier-quotations/${row.id}/purchase-order`);
+          showApiSuccess('Purchase order created from quotation');
+        }
+        load();
+      } catch (err: any) {
+        showApiError(err, `Supplier quotation ${operation} failed`);
+      }
       return;
     }
     try {
@@ -352,10 +392,10 @@ export function ProcurementPage({ kind }: { kind: ProcurementKind }) {
         columns={columnsFor(kind, status, operate, rfqOperation)}
         emptyMessage={`No ${meta.title.toLowerCase()} yet`}
       />
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setEditRow(null); setForm(defaultForm(kind)); setLines([blankLine]); } }}>
         <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>New {singular(meta.title)}</DialogTitle>
+            <DialogTitle>{editRow ? `Edit ${singular(meta.title)}` : `New ${singular(meta.title)}`}</DialogTitle>
           </DialogHeader>
 
           {missingSupplier && !loading && (
@@ -421,7 +461,7 @@ export function ProcurementPage({ kind }: { kind: ProcurementKind }) {
                 type="submit"
                 disabled={submitting || (missingSupplier && kind !== 'material-requests' && kind !== 'rfqs')}
               >
-                {submitting ? 'Creating...' : 'Create'}
+                {submitting ? (editRow ? 'Saving...' : 'Creating...') : (editRow ? 'Save changes' : 'Create')}
               </Button>
             </div>
           </form>
@@ -1335,11 +1375,16 @@ function PaymentTermEditor({ lines, setLines }: any) {
           Add Term
         </Button>
       </div>
+      <div className="grid grid-cols-12 gap-2 px-1 pb-1">
+        <p className="col-span-5 text-xs font-medium text-gray-500">Milestone / Label</p>
+        <p className="col-span-3 text-xs font-medium text-gray-500">% Share</p>
+        <p className="col-span-3 text-xs font-medium text-gray-500">Due After (Days)</p>
+      </div>
       {rows.map((line: any, index: number) => (
         <div key={index} className="grid grid-cols-12 gap-2">
           <Input
             className="col-span-5 h-8"
-            placeholder="Milestone (e.g. On Delivery)"
+            placeholder="e.g. On Delivery"
             value={line.label || ''}
             onChange={(e) => updateLine(rows, setLines, index, { label: e.target.value })}
           />
@@ -1669,6 +1714,7 @@ function columnsFor(kind: ProcurementKind, status: (id: string, value: string) =
       { key: 'description', header: 'Description' },
       { key: 'terms', header: 'Terms', render: (r: any) => r.terms?.length || 0 },
       { key: 'isActive', header: 'Active', render: (r: any) => (r.isActive ? 'Yes' : 'No') },
+      { key: 'actions', header: '', render: actions },
     ];
   if (kind === 'supplier-items')
     return [
@@ -1696,14 +1742,14 @@ function columnsFor(kind: ProcurementKind, status: (id: string, value: string) =
     ];
   if (kind === 'quality-inspections')
     return [
-      { key: 'inspectionNo', header: 'Inspection #' },
+      { key: 'inspectionNo', header: 'Inspection #', render: (r: any) => <Link href={`/procurement/quality-inspections/${r.id}`} className="font-mono font-semibold text-blue-600 hover:underline">{r.inspectionNo}</Link> },
       { key: 'status', header: 'Status', render: (r: any) => <StatusBadge status={r.status} /> },
       { key: 'inspectedQty', header: 'Inspected' },
       { key: 'acceptedQty', header: 'Accepted' },
       { key: 'rejectedQty', header: 'Rejected' },
     ];
   return [
-    { key: 'agreementNo', header: 'Agreement #' },
+    { key: 'agreementNo', header: 'Agreement #', render: (r: any) => <Link href={`/procurement/blanket-purchase-orders/${r.id}`} className="font-mono font-semibold text-blue-600 hover:underline">{r.agreementNo}</Link> },
     { key: 'supplier', header: 'Supplier', render: (r: any) => r.supplier?.name },
     { key: 'status', header: 'Status', render: (r: any) => <StatusBadge status={r.status} /> },
     { key: 'validFrom', header: 'Valid From', render: (r: any) => formatDate(r.validFrom) },
@@ -1764,6 +1810,31 @@ function Actions({ kind, row, status, operate, rfqOperation }: any) {
     {!row.submittedAt && <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); rfqOperation(row, 'submit'); }}>Submit</Button>}
     {row.submittedAt && <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); rfqOperation(row, 'send'); }}>Email Vendors</Button>}
   </div>;
+  if (kind === 'payment-terms') return (
+    <div className="flex justify-end gap-1">
+      <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); operate(row, 'edit-pt'); }}>Edit</Button>
+      <Button size="sm" variant="outline" className="text-red-500 hover:text-red-700" onClick={(e) => { e.stopPropagation(); operate(row, 'delete-pt'); }}>Delete</Button>
+    </div>
+  );
+  if (kind === 'supplier-quotations') return (
+    <div className="flex flex-wrap justify-end gap-1">
+      {row.status === 'DRAFT' && (
+        <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); operate(row, 'submit'); }}>
+          Submit
+        </Button>
+      )}
+      {row.status === 'SUBMITTED' && (
+        <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); operate(row, 'create-po'); }}>
+          Create PO
+        </Button>
+      )}
+      {row.rfqId && (
+        <Button size="sm" variant="outline" asChild>
+          <Link href={`/procurement/rfqs/${row.rfqId}`} onClick={(e) => e.stopPropagation()}>View RFQ</Link>
+        </Button>
+      )}
+    </div>
+  );
   return <span className="text-xs text-[#8a929d]">-</span>;
 }
 
