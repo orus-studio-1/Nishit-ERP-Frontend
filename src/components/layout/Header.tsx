@@ -1,6 +1,7 @@
 'use client';
 
-import { Menu, Bell, Search, LogOut, ChevronDown } from 'lucide-react';
+import { Menu, Bell, Search, LogOut, ChevronDown, History } from 'lucide-react';
+import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { getInitials } from '@/lib/utils';
 import api from '@/lib/api';
@@ -77,6 +78,9 @@ export function Header({ onMenuClick }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-3">
+        <Link href="/audit-trail" aria-label="Audit Trail" title="Audit Trail" className="rounded-md p-1.5 text-[#6b7280] hover:bg-[#eef3f5] hover:text-[#1f2937]">
+          <History className="h-5 w-5" />
+        </Link>
         <div className="relative">
           <button type="button" aria-label="Notifications" aria-expanded={notificationsOpen} onClick={toggleNotifications} className="relative rounded-md p-1.5 text-[#6b7280] hover:bg-[#eef3f5] hover:text-[#1f2937]">
             <Bell className="h-5 w-5" />
