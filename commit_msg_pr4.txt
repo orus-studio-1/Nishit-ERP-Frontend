@@ -1,0 +1,12 @@
+Dedupe audit-trail pages, fix procurement line-item layout, add MultiSelect virtualization
+
+- Add hooks/useAuditTrail.ts to consolidate the duplicated page/filter/load state
+  between the organization and procurement audit trail pages
+- Add lib/auditDiff.ts and components/shared/AuditFieldGrid.tsx for shared
+  before/after diff computation and rendering, used by both audit trail pages and
+  the sales enquiry detail page
+- Add search and virtualization (@tanstack/react-virtual) to MultiSelect for large
+  option lists -- fixes a bug where Radix Popover's first ResizeObserver
+  measurement could land before layout settled, leaving the list empty
+- Fix procurement line-item row layout: Line amount no longer overflows its box
+  for large values, remove button is a compact X icon with proper spacing

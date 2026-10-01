@@ -1,9 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Activity, Database, Eye, History, RefreshCw, Users } from 'lucide-react';
-import api from '@/lib/api';
-import { showApiError } from '@/lib/apiError';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
 import { Pagination } from '@/components/shared/Pagination';
@@ -14,40 +12,22 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AuditFieldGrid } from '@/components/shared/AuditFieldGrid';
+import { changedFields as diffChangedFields } from '@/lib/auditDiff';
+import { useAuditTrail, type Actor } from '@/hooks/useAuditTrail';
 
-type Actor = { id: string; firstName?: string; lastName?: string; email: string; role?: string; employee?: { employeeId?: string } };
 type Event = { id: string; layer: 'BUSINESS_EVENT' | 'RECORD_CHANGE'; documentType: string; entityId?: string; action: string; actor?: Actor | null; before?: unknown; changes?: unknown; after?: unknown; message?: string; ip?: string; userAgent?: string; requestId?: string; createdAt: string };
-type ResponseData = { items: Event[]; total: number; totalPages: number; users: Actor[]; coverage: { businessEvents: number; recordChanges: number } };
 
 const documents = ['MATERIAL_REQUEST', 'RFQ', 'SUPPLIER_QUOTATION', 'BLANKET_PURCHASE_ORDER', 'PURCHASE_ORDER', 'GATE_ENTRY', 'PURCHASE_RECEIPT', 'QUALITY_INSPECTION', 'PURCHASE_RETURN', 'LANDED_COST_VOUCHER', 'PURCHASE_INVOICE', 'THREE_WAY_MATCH', 'SUPPLIER_PAYMENT', 'COMMUNICATION', 'PAYMENT_TERMS', 'SUPPLIER_ITEM', 'BUYING_SETTINGS', 'VENDOR_RATING'];
 const actions = ['CREATE', 'UPDATE', 'DELETE', 'SUBMIT', 'CANCEL', 'APPROVE', 'REJECT', 'SEND', 'CLOSE', 'COMPLETE', 'DISPATCH', 'RECEIVE', 'STATUS_SUBMITTED', 'STATUS_CONFIRMED', 'STATUS_CANCELLED', 'CREATE_RFQ', 'STOCK_TRANSFER', 'SELECTIONS', 'GENERATE_PURCHASE_ORDERS', 'PURCHASE_ORDER', 'REVISE', 'MATCH', 'APPROVE_EXCEPTION', 'VENDOR_SELECTION', 'VENDOR_ACKNOWLEDGED', 'VENDOR_DECLINED'];
 const actorName = (actor?: Actor | null) => actor ? `${actor.firstName || ''} ${actor.lastName || ''}`.trim() || actor.email : 'Supplier / System';
 const human = (value: string) => value.replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, letter => letter.toUpperCase());
-const json = (value: unknown) => JSON.stringify(value ?? {}, null, 2);
 
 export default function ProcurementAuditTrailPage() {
-  const [events, setEvents] = useState<Event[]>([]);
-  const [users, setUsers] = useState<Actor[]>([]);
   const [selected, setSelected] = useState<Event | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const [coverage, setCoverage] = useState({ businessEvents: 0, recordChanges: 0 });
   const [filters, setFilters] = useState({ layer: '', documentType: '', action: '', userId: '', from: '', to: '', entityId: '' });
-  const limit = 25;
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = { page, limit, ...Object.fromEntries(Object.entries(filters).filter(([, value]) => value)) };
-      const response = await api.get('/procurement/audit-trail', { params });
-      const data: ResponseData = response.data?.data || {};
-      setEvents(data.items || []); setUsers(data.users || []); setTotal(data.total || 0); setTotalPages(data.totalPages || 1); setCoverage(data.coverage || { businessEvents: 0, recordChanges: 0 });
-    } catch (error) { showApiError(error, 'Could not load procurement audit trail'); }
-    finally { setLoading(false); }
-  }, [filters, page]);
-  useEffect(() => { load(); }, [load]);
+  const { items: events, users, loading, page, setPage, total, totalPages, raw, load, limit } = useAuditTrail<Event>('/procurement/audit-trail', filters, 'Could not load procurement audit trail');
+  const coverage = (raw.coverage as { businessEvents: number; recordChanges: number } | undefined) || { businessEvents: 0, recordChanges: 0 };
   const filter = (key: keyof typeof filters, value: string) => { setPage(1); setFilters(current => ({ ...current, [key]: value === 'ALL' ? '' : value })); };
   const activeEmployees = useMemo(() => new Set(events.map(event => event.actor?.id).filter(Boolean)).size, [events]);
 
@@ -88,14 +68,7 @@ function Metric({ icon: Icon, label, value }: { icon: any; label: string; value:
 function FilterSelect({ label, value, options, onChange }: { label: string; value: string; options: string[][]; onChange: (value: string) => void }) { return <div className="space-y-1"><Label>{label}</Label><Select value={value || 'ALL'} onValueChange={onChange}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">All</SelectItem>{options.map(([key, text]) => <SelectItem key={key} value={key}>{text}</SelectItem>)}</SelectContent></Select></div>; }
 
 function EventDialog({ event, onClose }: { event: Event | null; onClose: () => void }) {
-  const changes = changedFields(event?.before, event?.after, event?.changes);
-  return <Dialog open={!!event} onOpenChange={open => !open && onClose()}><DialogContent className="max-h-[88vh] max-w-5xl overflow-y-auto"><DialogHeader><DialogTitle>Procurement Audit Evidence</DialogTitle></DialogHeader>{event && <div className="space-y-5 text-sm"><div className="grid gap-3 rounded-lg border bg-gray-50 p-4 md:grid-cols-3"><Fact label="Employee" value={`${actorName(event.actor)}${event.actor?.email ? ` · ${event.actor.email}` : ''}`} /><Fact label="Document" value={`${human(event.documentType)} · ${event.entityId || 'multiple'}`} /><Fact label="Action" value={human(event.action)} /><Fact label="Evidence layer" value={event.layer === 'BUSINESS_EVENT' ? 'Business workflow event' : 'Authenticated record change'} /><Fact label="Timestamp" value={new Date(event.createdAt).toLocaleString()} /><Fact label="IP / Request" value={`${event.ip || '—'} · ${event.requestId || '—'}`} /></div>{event.message && <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-blue-900">{event.message}</div>}{changes.length > 0 && <div><h3 className="mb-2 font-semibold">Field-level changes</h3><div className="overflow-auto rounded-lg border"><table className="w-full text-sm"><thead className="bg-gray-50"><tr><th className="p-2 text-left">Field</th><th className="p-2 text-left">Previous</th><th className="p-2 text-left">New / Submitted</th></tr></thead><tbody>{changes.map(change => <tr className="border-t" key={change.field}><td className="p-2 font-mono text-xs">{change.field}</td><td className="max-w-80 break-all p-2 text-red-700">{change.before}</td><td className="max-w-80 break-all p-2 text-green-700">{change.after}</td></tr>)}</tbody></table></div></div>}<div className="grid gap-4 lg:grid-cols-3">{event.before != null && <JsonPanel title="Previous snapshot" value={event.before} />}<JsonPanel title="Submitted changes" value={event.changes} /><JsonPanel title="Saved result" value={event.after} /></div>{event.userAgent && <p className="break-all text-xs text-gray-500">Browser: {event.userAgent}</p>}</div>}</DialogContent></Dialog>;
+  const changes = diffChangedFields(event?.before, event?.after, event?.changes);
+  return <Dialog open={!!event} onOpenChange={open => !open && onClose()}><DialogContent className="max-h-[88vh] max-w-5xl overflow-y-auto"><DialogHeader><DialogTitle>Procurement Audit Evidence</DialogTitle></DialogHeader>{event && <div className="space-y-5 text-sm"><div className="grid gap-3 rounded-lg border bg-gray-50 p-4 md:grid-cols-3"><Fact label="Employee" value={`${actorName(event.actor)}${event.actor?.email ? ` · ${event.actor.email}` : ''}`} /><Fact label="Document" value={`${human(event.documentType)} · ${event.entityId || 'multiple'}`} /><Fact label="Action" value={human(event.action)} /><Fact label="Evidence layer" value={event.layer === 'BUSINESS_EVENT' ? 'Business workflow event' : 'Authenticated record change'} /><Fact label="Timestamp" value={new Date(event.createdAt).toLocaleString()} /><Fact label="IP / Request" value={`${event.ip || '—'} · ${event.requestId || '—'}`} /></div>{event.message && <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-blue-900">{event.message}</div>}{changes.length > 0 && <div><h3 className="mb-2 font-semibold">Field-level changes</h3><div className="overflow-auto rounded-lg border"><table className="w-full text-sm"><thead className="bg-gray-50"><tr><th className="p-2 text-left">Field</th><th className="p-2 text-left">Previous</th><th className="p-2 text-left">New / Submitted</th></tr></thead><tbody>{changes.map(change => <tr className="border-t" key={change.field}><td className="p-2 font-mono text-xs">{change.field}</td><td className="max-w-80 break-all p-2 text-red-700">{change.before}</td><td className="max-w-80 break-all p-2 text-green-700">{change.after}</td></tr>)}</tbody></table></div></div>}<div className="grid gap-4 lg:grid-cols-3">{event.before != null && <div><Label>Previous snapshot</Label><AuditFieldGrid value={event.before} /></div>}<div><Label>Submitted changes</Label><AuditFieldGrid value={event.changes} /></div><div><Label>Saved result</Label><AuditFieldGrid value={event.after} /></div></div>{event.userAgent && <p className="break-all text-xs text-gray-500">Browser: {event.userAgent}</p>}</div>}</DialogContent></Dialog>;
 }
 function Fact({ label, value }: { label: string; value: string }) { return <p><span className="block text-xs uppercase tracking-wide text-gray-500">{label}</span><span className="break-all font-medium">{value}</span></p>; }
-function JsonPanel({ title, value }: { title: string; value: unknown }) { return <div><Label>{title}</Label><pre className="mt-1 max-h-80 overflow-auto rounded-lg bg-gray-950 p-3 text-xs text-gray-100">{json(value)}</pre></div>; }
-function changedFields(before: unknown, after: unknown, submitted: unknown) {
-  const oldRow = before && typeof before === 'object' && !Array.isArray(before) ? before as Record<string, unknown> : {};
-  const newRow = after && typeof after === 'object' && !Array.isArray(after) ? after as Record<string, unknown> : submitted && typeof submitted === 'object' && !Array.isArray(submitted) ? submitted as Record<string, unknown> : {};
-  return [...new Set([...Object.keys(oldRow), ...Object.keys(newRow)])].filter(field => json(oldRow[field]) !== json(newRow[field])).slice(0, 100).map(field => ({ field, before: compact(oldRow[field]), after: compact(newRow[field]) }));
-}
-function compact(value: unknown) { if (value == null) return '—'; const text = typeof value === 'string' ? value : json(value); return text.length > 300 ? `${text.slice(0, 300)}…` : text; }
