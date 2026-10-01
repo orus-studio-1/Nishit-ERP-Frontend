@@ -1,10 +1,8 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Eye, History, RefreshCw } from 'lucide-react';
-import api from '@/lib/api';
-import { showApiError } from '@/lib/apiError';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
 import { Pagination } from '@/components/shared/Pagination';
@@ -14,72 +12,27 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AuditFieldGrid } from '@/components/shared/AuditFieldGrid';
+import { useAuditTrail, type Actor } from '@/hooks/useAuditTrail';
 
-type Actor = { id: string; firstName?: string; lastName?: string; email: string; role?: string; employee?: { employeeId?: string } };
 type AuditRow = { id: string; entityType: string; entityId?: string; action: string; before?: unknown; diff?: unknown; after?: unknown; ip?: string; userAgent?: string; requestId?: string; createdAt: string; actor?: Actor | null };
 
 const modules = ['ACCOUNTING', 'CRM', 'CUSTOMERS', 'HR', 'INVENTORY', 'INVOICING', 'PROCUREMENT', 'PROJECTS', 'SALES', 'SUPPLIERS'];
 const actions = ['CREATE', 'UPDATE', 'DELETE', 'SUBMIT', 'CANCEL', 'AMEND', 'APPROVE', 'REJECT', 'CONVERT', 'COMPLETE', 'DISPATCH', 'RECEIVE'];
 const actorName = (actor?: Actor | null) => actor ? `${actor.firstName || ''} ${actor.lastName || ''}`.trim() || actor.email : 'System';
-const pretty = (value: unknown) => JSON.stringify(value ?? {}, null, 2);
-
-const fieldLabel = (key: string) => key.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/^./, char => char.toUpperCase());
-const looksLikeDate = (key: string, value: string) => /(date|at)$/i.test(key) && !Number.isNaN(Date.parse(value));
-const formatScalar = (key: string, value: unknown): string => {
-  if (value === null || value === undefined || value === '') return '—';
-  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
-  if (typeof value === 'number') return Number.isInteger(value) ? value.toLocaleString('en-IN') : value.toLocaleString('en-IN', { maximumFractionDigits: 2 });
-  if (typeof value === 'string' && looksLikeDate(key, value)) return new Date(value).toLocaleString('en-IN');
-  return String(value);
-};
-
-// Renders a flat object as a readable field/value grid; nested objects/arrays fall back to inline JSON
-// since audit diffs are usually one level of scalars (line items are the exception).
-function FieldGrid({ value }: { value: unknown }) {
-  if (value == null || typeof value !== 'object' || Array.isArray(value)) {
-    return <pre className="mt-1 max-h-72 overflow-auto rounded-lg bg-gray-950 p-4 text-xs text-gray-100">{pretty(value)}</pre>;
-  }
-  const entries = Object.entries(value as Record<string, unknown>);
-  if (!entries.length) return <p className="mt-1 text-sm text-gray-500">No fields recorded.</p>;
-  return <div className="mt-1 grid gap-x-6 gap-y-2 rounded-lg border bg-white p-3 sm:grid-cols-2">
-    {entries.map(([key, val]) => <div key={key} className="min-w-0">
-      <p className="text-xs text-gray-500">{fieldLabel(key)}</p>
-      {val !== null && typeof val === 'object'
-        ? <p className="truncate font-mono text-xs text-gray-700" title={pretty(val)}>{Array.isArray(val) ? `${val.length} item(s)` : 'Nested object'}</p>
-        : <p className="break-words text-sm font-medium text-gray-900">{formatScalar(key, val)}</p>}
-    </div>)}
-  </div>;
-}
 
 function AuditTrailContent() {
   const searchParams = useSearchParams();
-  const [rows, setRows] = useState<AuditRow[]>([]);
-  const [users, setUsers] = useState<Actor[]>([]);
   const [selected, setSelected] = useState<AuditRow | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
   const [filters, setFilters] = useState({ module: '', action: '', userId: '', from: '', to: '', entityId: '' });
-  const limit = 25;
+  const { items: rows, users, loading, page, setPage, total, totalPages, load, limit } = useAuditTrail<AuditRow>('/platform/audit', filters, 'Could not load the organization audit trail');
 
   useEffect(() => {
     const moduleName = searchParams.get('module');
     setPage(1);
     setFilters(current => ({ ...current, module: moduleName?.toUpperCase() || '' }));
-  }, [searchParams]);
+  }, [searchParams, setPage]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await api.get('/platform/audit', { params: { page, limit, ...Object.fromEntries(Object.entries(filters).filter(([, value]) => value)) } });
-      const data = response.data?.data || {};
-      setRows(data.items || []); setUsers(data.users || []); setTotal(data.total || 0); setTotalPages(data.totalPages || 1);
-    } catch (error) { showApiError(error, 'Could not load the organization audit trail'); }
-    finally { setLoading(false); }
-  }, [filters, page]);
-
-  useEffect(() => { load(); }, [load]);
   const setFilter = (key: keyof typeof filters, value: string) => { setPage(1); setFilters(current => ({ ...current, [key]: value === 'ALL' ? '' : value })); };
 
   const columns = [
@@ -104,7 +57,7 @@ function AuditTrailContent() {
       <div className="space-y-1"><Label>Record ID</Label><Input placeholder="Exact record ID" value={filters.entityId} onChange={event => setFilter('entityId', event.target.value)} /></div>
     </div>
     {!rows.length && !loading ? <EmptyState icon={History} title="No audit activity found" description="Successful changes made by employees will appear here. Try clearing the filters if activity already exists." /> : <><DataTable data={rows} columns={columns} isLoading={loading} />{total > limit && <Pagination page={page} totalPages={totalPages} total={total} limit={limit} onPageChange={setPage} />}</>}
-    <Dialog open={!!selected} onOpenChange={open => !open && setSelected(null)}><DialogContent className="max-h-[85vh] max-w-4xl overflow-y-auto"><DialogHeader><DialogTitle>Audit Event Details</DialogTitle></DialogHeader>{selected && <div className="space-y-4 text-sm"><div className="grid gap-3 rounded-lg border bg-gray-50 p-4 sm:grid-cols-2"><p><span className="text-gray-500">Employee:</span> {actorName(selected.actor)} ({selected.actor?.email || 'system'})</p><p><span className="text-gray-500">Action:</span> {selected.action}</p><p><span className="text-gray-500">Record:</span> {selected.entityType} · {selected.entityId || 'multiple'}</p><p><span className="text-gray-500">Time:</span> {new Date(selected.createdAt).toLocaleString()}</p><p><span className="text-gray-500">IP:</span> {selected.ip || '—'}</p><p><span className="text-gray-500">Request ID:</span> <span className="font-mono text-xs">{selected.requestId || '—'}</span></p></div>{selected.before != null && <div><Label>Previous values</Label><FieldGrid value={selected.before} /></div>}<div><Label>Fields submitted / changed</Label><FieldGrid value={selected.diff} /></div><div><Label>Saved result</Label><FieldGrid value={selected.after} /></div></div>}</DialogContent></Dialog>
+    <Dialog open={!!selected} onOpenChange={open => !open && setSelected(null)}><DialogContent className="max-h-[85vh] max-w-4xl overflow-y-auto"><DialogHeader><DialogTitle>Audit Event Details</DialogTitle></DialogHeader>{selected && <div className="space-y-4 text-sm"><div className="grid gap-3 rounded-lg border bg-gray-50 p-4 sm:grid-cols-2"><p><span className="text-gray-500">Employee:</span> {actorName(selected.actor)} ({selected.actor?.email || 'system'})</p><p><span className="text-gray-500">Action:</span> {selected.action}</p><p><span className="text-gray-500">Record:</span> {selected.entityType} · {selected.entityId || 'multiple'}</p><p><span className="text-gray-500">Time:</span> {new Date(selected.createdAt).toLocaleString()}</p><p><span className="text-gray-500">IP:</span> {selected.ip || '—'}</p><p><span className="text-gray-500">Request ID:</span> <span className="font-mono text-xs">{selected.requestId || '—'}</span></p></div>{selected.before != null && <div><Label>Previous values</Label><AuditFieldGrid value={selected.before} /></div>}<div><Label>Fields submitted / changed</Label><AuditFieldGrid value={selected.diff} /></div><div><Label>Saved result</Label><AuditFieldGrid value={selected.after} /></div></div>}</DialogContent></Dialog>
   </div>;
 }
 

@@ -1,8 +1,13 @@
 'use client';
 import * as React from 'react';
 import * as PopoverPrimitive from '@radix-ui/react-popover';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { ChevronDown, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+const ROW_HEIGHT = 30;
+/** Below this many rows, plain rendering is simpler and just as fast — virtualize only long lists. */
+const VIRTUALIZE_THRESHOLD = 50;
 
 export interface MultiSelectOption {
   value: string;
@@ -32,6 +37,25 @@ export function MultiSelect({
   const filtered = normalizedQuery ? options.filter((o) => o.label.toLocaleLowerCase().includes(normalizedQuery)) : options;
   const toggle = (v: string) => onChange(value.includes(v) ? value.filter((x) => x !== v) : [...value, v]);
   const selectedLabels = options.filter((o) => value.includes(o.value)).map((o) => o.label);
+
+  const listRef = React.useRef<HTMLDivElement>(null);
+  const shouldVirtualize = filtered.length > VIRTUALIZE_THRESHOLD;
+  const virtualizer = useVirtualizer({
+    count: filtered.length,
+    getScrollElement: () => listRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 8,
+    enabled: shouldVirtualize,
+  });
+  // Radix's popover content is positioned via a portal, and the virtualizer's first
+  // ResizeObserver measurement can land before that settles (scrollRect 0x0), so the list
+  // renders empty. Deferring one frame guarantees the popover has laid out and the scroll
+  // container ref is attached before we force a re-measure.
+  React.useEffect(() => {
+    if (!open || !shouldVirtualize) return;
+    const id = requestAnimationFrame(() => virtualizer.measure());
+    return () => cancelAnimationFrame(id);
+  }, [open, shouldVirtualize, virtualizer]);
 
   return (
     <PopoverPrimitive.Root open={open} onOpenChange={(next) => { setOpen(next); if (!next) setQuery(''); }}>
@@ -76,9 +100,25 @@ export function MultiSelect({
               Clear selection ({value.length})
             </button>
           )}
-          <div className="max-h-64 overflow-y-auto p-1">
+          <div ref={listRef} className="max-h-64 overflow-y-auto p-1">
             {filtered.length === 0 ? (
               <div className="px-3 py-6 text-center text-sm text-[#6b7280]">{options.length === 0 ? emptyText : 'No matching options'}</div>
+            ) : shouldVirtualize ? (
+              <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
+                {virtualizer.getVirtualItems().map((row) => {
+                  const opt = filtered[row.index];
+                  return (
+                    <label
+                      key={opt.value}
+                      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: row.size, transform: `translateY(${row.start}px)` }}
+                      className="flex cursor-pointer items-center gap-2 rounded-sm px-2 text-sm hover:bg-[#eef6fd]"
+                    >
+                      <input type="checkbox" checked={value.includes(opt.value)} onChange={() => toggle(opt.value)} className="h-3.5 w-3.5 rounded border-[#d9d4cc]" />
+                      <span className="truncate">{opt.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
             ) : (
               filtered.map((opt) => (
                 <label key={opt.value} className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-[#eef6fd]">
