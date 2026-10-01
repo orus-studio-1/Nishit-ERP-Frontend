@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ClipboardList, FileClock, PackageCheck, Play, Plus, Trash2, Truck } from 'lucide-react';
+import { ClipboardList, PackageCheck, Play, Plus, Trash2, Truck } from 'lucide-react';
 import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -757,132 +757,6 @@ function DeliveryRows({ rows, products, warehouses = [], fromOrder = false, onCh
         </Button>
       </div>}
     </div>
-  );
-}
-
-export function AuditLogPage() {
-  const [logs, setLogs] = useState<any[]>([]);
-  const [totalRows, setTotalRows] = useState(0);
-  const [filters, setFilters] = useState({ entityType: 'ALL', action: 'ALL', search: '', fromDate: '', toDate: '' });
-
-  const load = () => {
-    api
-      .get('/invoicing/audit-logs', {
-        params: {
-          limit: 100,
-          entityType: filters.entityType === 'ALL' ? undefined : filters.entityType,
-          action: filters.action === 'ALL' ? undefined : filters.action,
-          search: filters.search || undefined,
-          fromDate: filters.fromDate || undefined,
-          toDate: filters.toDate || undefined,
-        },
-      })
-      .then((res) => {
-        setLogs(items(res.data));
-        setTotalRows(total(res.data));
-      })
-      .catch((err) => showApiError(err, 'Failed to load audit log'));
-  };
-
-  useEffect(() => {
-    load();
-  }, [filters.entityType, filters.action]);
-
-  return (
-    <DeskPage
-      title="Audit Log"
-      description="Immutable document timeline for invoice lifecycle, delivery, credit note, and payment actions."
-      meta={`${totalRows} events`}
-      action={
-        <Button variant="outline" onClick={load}>
-          Refresh
-        </Button>
-      }
-    >
-      <div className="grid gap-3 border-b border-[#edf0f2] bg-[#f8faf9] p-3 md:grid-cols-5">
-        <Input
-          value={filters.search}
-          onChange={(event) => setFilters((prev) => ({ ...prev, search: event.target.value }))}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') load();
-          }}
-          placeholder="Search message or actor"
-        />
-        <Select
-          value={filters.entityType}
-          onValueChange={(entityType) => setFilters((prev) => ({ ...prev, entityType }))}
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {['ALL', 'SALES_INVOICE', 'DELIVERY_NOTE', 'CREDIT_NOTE', 'PAYMENT_ENTRY'].map((type) => (
-              <SelectItem key={type} value={type}>
-                {type.replaceAll('_', ' ')}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={filters.action} onValueChange={(action) => setFilters((prev) => ({ ...prev, action }))}>
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {[
-              'ALL',
-              'CREATE',
-              'UPDATE',
-              'SUBMIT',
-              'CANCEL',
-              'AMEND',
-              'DELETE',
-              'CREATE_FROM_SALES_ORDER',
-              'CREATE_FROM_DELIVERY_NOTE',
-            ].map((action) => (
-              <SelectItem key={action} value={action}>
-                {action.replaceAll('_', ' ')}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Input
-          type="date"
-          value={filters.fromDate}
-          onChange={(event) => setFilters((prev) => ({ ...prev, fromDate: event.target.value }))}
-        />
-        <Input
-          type="date"
-          value={filters.toDate}
-          onChange={(event) => setFilters((prev) => ({ ...prev, toDate: event.target.value }))}
-        />
-      </div>
-      {logs.length ? (
-        <DataTable
-          data={logs}
-          columns={[
-            { key: 'createdAt', header: 'Time', render: (l: any) => formatDate(l.createdAt) },
-            { key: 'entityType', header: 'Document' },
-            {
-              key: 'voucher',
-              header: 'Voucher',
-              render: (l: any) =>
-                l.invoice?.invoiceNo || l.deliveryNote?.deliveryNo || l.creditNote?.creditNoteNo || l.entityId,
-            },
-            { key: 'action', header: 'Action', render: (l: any) => <StatusBadge status={l.action} /> },
-            { key: 'statusBefore', header: 'Before', render: (l: any) => l.statusBefore || '-' },
-            { key: 'statusAfter', header: 'After', render: (l: any) => l.statusAfter || '-' },
-            { key: 'actorEmail', header: 'User', render: (l: any) => l.actorEmail || l.actorRole || '-' },
-            { key: 'message', header: 'Message', render: (l: any) => l.message || '-' },
-          ]}
-        />
-      ) : (
-        <EmptyState
-          icon={FileClock}
-          title="No audit events"
-          description="Document actions will appear here as users work."
-        />
-      )}
-    </DeskPage>
   );
 }
 

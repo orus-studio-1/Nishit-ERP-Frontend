@@ -17,7 +17,7 @@ import { useAuditTrail, type Actor } from '@/hooks/useAuditTrail';
 
 type AuditRow = { id: string; entityType: string; entityId?: string; action: string; before?: unknown; diff?: unknown; after?: unknown; ip?: string; userAgent?: string; requestId?: string; createdAt: string; actor?: Actor | null };
 
-const modules = ['ACCOUNTING', 'CRM', 'CUSTOMERS', 'HR', 'INVENTORY', 'INVOICING', 'PROCUREMENT', 'PROJECTS', 'SALES', 'SUPPLIERS'];
+const modules = ['ACCESS', 'ACCOUNTING', 'CRM', 'CUSTOMERS', 'HR', 'INVENTORY', 'INVOICING', 'PROCUREMENT', 'PROJECTS', 'SALES', 'SUPPLIERS'];
 const actions = ['CREATE', 'UPDATE', 'DELETE', 'SUBMIT', 'CANCEL', 'AMEND', 'APPROVE', 'REJECT', 'CONVERT', 'COMPLETE', 'DISPATCH', 'RECEIVE'];
 const actorName = (actor?: Actor | null) => actor ? `${actor.firstName || ''} ${actor.lastName || ''}`.trim() || actor.email : 'System';
 

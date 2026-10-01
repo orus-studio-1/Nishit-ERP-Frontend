@@ -56,7 +56,6 @@ export const navItems: NavItem[] = [
 	      { label: 'Item-wise Sales', href: '/inventory/reports/item-wise-sales', icon: ChartColumnIncreasing, permission: 'inventory:stock-balance:read' },
 	      { label: 'Gross Profit', href: '/inventory/reports/gross-profit', icon: CircleDollarSign, permission: 'inventory:stock-balance:read' },
 	      { label: 'Slow Moving Stock', href: '/inventory/reports/slow-moving-stock', icon: ArchiveX, permission: 'inventory:stock-balance:read' },
-	      { label: 'Inventory Audit Trail', href: '/audit-trail?module=inventory', icon: History, permission: 'access:audit:read' },
     ],
   },
   {
@@ -92,7 +91,6 @@ export const navItems: NavItem[] = [
       { label: 'Assignment Rules', href: '/crm/assignment-rules', icon: Route, permission: 'crm:assignment-rules:read' },
       { label: 'CRM Reports', href: '/crm/reports', icon: BarChart3, permission: 'crm:reports:read' },
       { label: 'CRM Configuration', href: '/crm/settings', icon: Settings },
-      { label: 'CRM Audit Trail', href: '/audit-trail?module=crm', icon: History, permission: 'access:audit:read' },
     ],
   },
   {
@@ -102,7 +100,6 @@ export const navItems: NavItem[] = [
       { label: 'Fulfilment', href: '/sales/fulfilment', icon: PackageCheck },
       { label: 'Sales Reports', href: '/sales/reports', icon: BarChart3 },
       { label: 'Sales Configuration', href: '/sales/settings', icon: Settings },
-      { label: 'Sales Audit Trail', href: '/audit-trail?module=sales', icon: History, permission: 'access:audit:read' },
     ],
   },
   {
@@ -117,7 +114,6 @@ export const navItems: NavItem[] = [
       { label: 'Ledger', href: '/invoicing/ledger', icon: BookOpen },
       { label: 'Print Formats', href: '/invoicing/print-formats', icon: Printer },
       { label: 'Recurring Invoices', href: '/invoicing/subscriptions', icon: Repeat },
-      { label: 'Audit Log', href: '/invoicing/audit-log', icon: ClipboardCheck },
       { label: 'Aging Report', href: '/invoicing/reports/aging', icon: Hourglass },
       { label: 'Outstanding', href: '/invoicing/reports/outstanding', icon: CircleDollarSign },
       { label: 'Revenue by Customer', href: '/invoicing/reports/revenue-by-customer', icon: Users },
@@ -144,7 +140,6 @@ export const navItems: NavItem[] = [
       { label: 'Communications', href: '/procurement/communications', icon: Activity, permission: 'procurement:communications:read' },
       { label: 'Procurement Tracker', href: '/procurement/tracker', icon: BarChart3, permission: 'procurement:tracker:read' },
       { label: 'Procurement Reports', href: '/procurement/reports', icon: ChartColumnIncreasing, permission: 'procurement:reports:read' },
-      { label: 'Procurement Audit Trail', href: '/procurement/audit-trail', icon: History, permission: 'access:audit:read' },
       { label: 'Buying Settings', href: '/procurement/settings', icon: Settings, permission: 'procurement:settings:read' },
     ],
   },

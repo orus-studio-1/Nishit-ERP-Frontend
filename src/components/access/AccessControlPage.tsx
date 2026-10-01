@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { History, KeyRound, Plus, RefreshCcw, ShieldCheck, Users } from 'lucide-react';
 import api from '@/lib/api';
-import { formatDateTime } from '@/lib/utils';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
 import { StatusBadge } from '@/components/shared/StatusBadge';
@@ -32,7 +32,6 @@ export function AccessControlPage() {
   const [permissions, setPermissions] = useState<any[]>([]);
   const [roles, setRoles] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
-  const [audit, setAudit] = useState<any[]>([]);
   const [summary, setSummary] = useState<any>({});
   const [selectedRoleId, setSelectedRoleId] = useState('');
   const [roleForm, setRoleForm] = useState({ name: '', title: '', description: '' });
@@ -51,17 +50,15 @@ export function AccessControlPage() {
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [catalog, roleRes, userRes, auditRes, summaryRes] = await Promise.all([
+      const [catalog, roleRes, userRes, summaryRes] = await Promise.all([
         api.get('/access/permissions'),
         api.get('/access/roles'),
         api.get('/access/users'),
-        api.get('/access/audit'),
         api.get('/access/summary'),
       ]);
       setPermissions(catalog.data.data || []);
       setRoles(roleRes.data.data || []);
       setUsers(userRes.data.data || []);
-      setAudit(auditRes.data.data || []);
       setSummary(summaryRes.data.data || {});
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to load access control');
@@ -158,7 +155,9 @@ export function AccessControlPage() {
         <Card><CardContent className="flex items-center gap-3 p-4"><Users className="h-5 w-5 text-[#1674c4]" /><div><p className="text-xs text-[#6b7280]">Employee Users</p><p className="text-xl font-semibold">{summary.users || 0}</p></div></CardContent></Card>
         <Card><CardContent className="flex items-center gap-3 p-4"><ShieldCheck className="h-5 w-5 text-[#16a34a]" /><div><p className="text-xs text-[#6b7280]">Roles</p><p className="text-xl font-semibold">{summary.roles || 0}</p></div></CardContent></Card>
         <Card><CardContent className="flex items-center gap-3 p-4"><KeyRound className="h-5 w-5 text-[#d97706]" /><div><p className="text-xs text-[#6b7280]">Permissions</p><p className="text-xl font-semibold">{summary.permissions || permissions.length}</p></div></CardContent></Card>
-        <Card><CardContent className="flex items-center gap-3 p-4"><History className="h-5 w-5 text-[#6b7280]" /><div><p className="text-xs text-[#6b7280]">Audit Events</p><p className="text-xl font-semibold">{audit.length}</p></div></CardContent></Card>
+        <Link href="/audit-trail?module=access">
+          <Card className="transition hover:border-[#2490ef]"><CardContent className="flex items-center gap-3 p-4"><History className="h-5 w-5 text-[#6b7280]" /><div><p className="text-xs text-[#6b7280]">Audit Trail</p><p className="text-xl font-semibold">View events</p></div></CardContent></Card>
+        </Link>
       </div>
 
       <Tabs defaultValue="users">
@@ -166,7 +165,6 @@ export function AccessControlPage() {
           <TabsTrigger value="users">Employee Access</TabsTrigger>
           <TabsTrigger value="roles">Roles</TabsTrigger>
           <TabsTrigger value="permissions">Permissions</TabsTrigger>
-          <TabsTrigger value="audit">Audit</TabsTrigger>
         </TabsList>
 
         <TabsContent value="users">
@@ -228,15 +226,6 @@ export function AccessControlPage() {
             onDeny={() => undefined}
             readOnly
           />
-        </TabsContent>
-
-        <TabsContent value="audit">
-          <DataTable data={audit} columns={[
-            { key: 'createdAt', header: 'Time', render: (r: any) => formatDateTime(r.createdAt) },
-            { key: 'actor', header: 'Actor', render: (r: any) => r.actor ? nameOf(r.actor) : 'System' },
-            { key: 'action', header: 'Action', render: (r: any) => <StatusBadge status={r.action} /> },
-            { key: 'message', header: 'Message' },
-          ]} />
         </TabsContent>
       </Tabs>
     </div>
