@@ -19,6 +19,7 @@ import {
   Scale,
   Settings,
   Truck,
+  X,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '@/lib/api';
@@ -1427,7 +1428,7 @@ function LineEditor({ kind, lines, setLines, products, total, currency }: any) {
       </div>
       {lines.map((line: any, index: number) => (
         <div key={index} className="grid grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-gray-50/50 p-3 md:grid-cols-12 md:items-end">
-          <div className="space-y-1 md:col-span-4">
+          <div className="space-y-1 md:col-span-3">
             <Label className="text-xs">Product / Item *</Label>
             <Select
               value={line.productId}
@@ -1464,22 +1465,22 @@ function LineEditor({ kind, lines, setLines, products, total, currency }: any) {
           <div className="space-y-1 md:col-span-2"><Label className="text-xs">Rate ({currency || 'INR'}) *</Label><Input aria-label={`Rate in ${currency || 'INR'}`} className="h-9 bg-white" type="number" min="0" step="any" placeholder="0.00" value={line.unitPrice || line.rate || 0} onChange={(e) => updateLine(lines, setLines, index, { unitPrice: Number(e.target.value), rate: Number(e.target.value) })} /></div>
           <div className="space-y-1 md:col-span-1"><Label className="text-xs">Discount %</Label><Input aria-label="Discount percentage" className="h-9 bg-white" type="number" min="0" max="100" step="any" placeholder="0" value={line.discount || 0} onChange={(e) => updateLine(lines, setLines, index, { discount: Number(e.target.value) })} /></div>
           <div className="space-y-1 md:col-span-1"><Label className="text-xs">Tax %</Label><Input aria-label="Tax percentage" className="h-9 bg-white" type="number" min="0" step="any" placeholder="0" value={line.taxRate || 0} onChange={(e) => updateLine(lines, setLines, index, { taxRate: Number(e.target.value) })} /></div>
-          <div className="space-y-1 md:col-span-1">
+          <div className="min-w-0 space-y-1 md:col-span-2">
             <Label className="text-xs">Line amount</Label>
-            <div className="flex h-9 items-center justify-end rounded-md border bg-white px-2 text-xs font-semibold text-gray-800" title="Quantity × rate before document-level charges">
-              {formatCurrency(Number(line.quantity || 0) * Number(line.unitPrice || line.rate || 0) * (1 - Number(line.discount || 0) / 100) * (1 + Number(line.taxRate || 0) / 100), currency)}
+            <div className="flex h-9 items-center rounded-md border bg-white px-2 text-xs font-semibold text-gray-800" title="Quantity × rate before document-level charges">
+              <span className="whitespace-nowrap">{formatCurrency(Number(line.quantity || 0) * Number(line.unitPrice || line.rate || 0) * (1 - Number(line.discount || 0) / 100) * (1 + Number(line.taxRate || 0) / 100), currency)}</span>
             </div>
           </div>
           <Button
             type="button"
             variant="ghost"
-            size="sm"
+            size="icon"
             aria-label={`Remove item row ${index + 1}`}
             title="Remove item"
-            className="h-9 text-red-600 hover:bg-red-50 hover:text-red-700 md:col-span-1"
+            className="h-9 w-9 justify-self-end text-red-600 hover:bg-red-50 hover:text-red-700 md:col-span-1"
             onClick={() => setLines(lines.filter((_: any, i: number) => i !== index))}
           >
-            Remove
+            <X className="h-4 w-4" />
           </Button>
           {kind === 'purchase-receipts' && <div className="grid gap-3 border-t pt-3 md:col-span-12 sm:grid-cols-2">
             <div className="space-y-1"><Label className="text-xs">Internal Batch No {products.find((p: any) => p.id === line.productId)?.hasBatchNo ? '*' : ''}</Label><Input aria-label="Batch number" className="h-8 bg-white" placeholder="e.g. BATCH-001" value={line.batchNo || ''} onChange={(e: any) => updateLine(lines, setLines, index, { batchNo: e.target.value })} /></div>
