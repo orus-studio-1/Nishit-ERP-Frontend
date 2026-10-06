@@ -41,9 +41,7 @@ export default function StockMovementsPage() {
     batchNo: '',
     serialNo: '',
     notes: '',
-    reference: '',
-    batchNo: '',
-    serialNo: '',
+    reference: ''
   });
   const limit = 20;
 
