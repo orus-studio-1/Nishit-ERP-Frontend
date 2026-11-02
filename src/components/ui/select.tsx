@@ -3,6 +3,7 @@ import * as React from 'react';
 import * as SelectPrimitive from '@radix-ui/react-select';
 import { Check, ChevronDown, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useDebouncedServerSearch } from '@/hooks/useServerOptionSearch';
 
 const Select = SelectPrimitive.Root;
 const SelectGroup = SelectPrimitive.Group;
@@ -22,6 +23,8 @@ type SelectContentProps = React.ComponentPropsWithoutRef<typeof SelectPrimitive.
   /** Always show search for API-backed lists. "auto" adds it when a list grows large. */
   searchable?: boolean | 'auto';
   searchPlaceholder?: string;
+  /** Also looks up what's typed on the server, for lists that only hold their first page. */
+  onServerSearch?: (query: string) => Promise<void>;
 };
 
 function nodeText(node: React.ReactNode): string {
@@ -50,10 +53,11 @@ function filterSelectItems(node: React.ReactNode, query: string): React.ReactNod
 }
 
 const SelectContent = React.forwardRef<React.ElementRef<typeof SelectPrimitive.Content>, SelectContentProps>(
-  ({ className, children, position = 'popper', searchable = 'auto', searchPlaceholder = 'Search…', ...props }, ref) => {
+  ({ className, children, position = 'popper', searchable = 'auto', searchPlaceholder = 'Search…', onServerSearch, ...props }, ref) => {
     const [query, setQuery] = React.useState('');
+    const { searching, search } = useDebouncedServerSearch(onServerSearch);
     const itemCount = countSelectItems(children);
-    const showSearch = searchable === true || (searchable === 'auto' && itemCount > 0);
+    const showSearch = Boolean(onServerSearch) || searchable === true || (searchable === 'auto' && itemCount > 0);
     const normalizedQuery = query.trim().toLocaleLowerCase();
     const filteredChildren = normalizedQuery ? filterSelectItems(children, normalizedQuery) : children;
     const filteredCount = normalizedQuery ? countSelectItems(filteredChildren) : itemCount;
@@ -70,14 +74,14 @@ const SelectContent = React.forwardRef<React.ElementRef<typeof SelectPrimitive.C
                 className="h-8 w-full rounded-md border border-[#d9d4cc] bg-white pl-8 pr-2 text-sm outline-none placeholder:text-[#9aa3af] focus:border-[#2490ef] focus:ring-2 focus:ring-[#2490ef]/15"
                 placeholder={searchPlaceholder}
                 value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                onChange={(event) => { setQuery(event.target.value); search(event.target.value); }}
                 onKeyDown={(event) => event.stopPropagation()}
               />
             </div>
           )}
           <SelectPrimitive.Viewport className={cn('max-h-[inherit] overflow-y-auto p-1', showSearch && 'max-h-64', position === 'popper' && 'w-full min-w-[var(--radix-select-trigger-width)]')}>
             {filteredCount > 0 || !normalizedQuery ? filteredChildren : (
-              <div className="px-3 py-6 text-center text-sm text-[#6b7280]">No matching options</div>
+              <div className="px-3 py-6 text-center text-sm text-[#6b7280]">{searching ? 'Searching…' : 'No matching options'}</div>
             )}
           </SelectPrimitive.Viewport>
         </SelectPrimitive.Content>

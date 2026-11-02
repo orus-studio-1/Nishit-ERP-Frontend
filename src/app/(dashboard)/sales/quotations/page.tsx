@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { EmptyState } from '@/components/shared/EmptyState';
 import { LineItemGrid, LineItemRow } from '@/components/invoicing/LineItemGrid';
 import api from '@/lib/api';
+import { useServerOptionSearch } from '@/hooks/useServerOptionSearch';
 import { Quotation } from '@/types';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { showApiError, showApiSuccess } from '@/lib/apiError';
@@ -27,6 +28,7 @@ export default function QuotationsPage() {
   const router = useRouter();
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
+  const searchCustomers = useServerOptionSearch('/customers', setCustomers, { params: { isActive: true } });
   const [quotationDefaults, setQuotationDefaults] = useState<any>({});
   const [sourceQuotation, setSourceQuotation] = useState<Quotation | null>(null);
   const [newOpen, setNewOpen] = useState(false);
@@ -354,7 +356,7 @@ export default function QuotationsPage() {
                   <SelectTrigger>
                     <SelectValue placeholder="Select customer" />
                   </SelectTrigger>
-                  <SelectContent searchable searchPlaceholder="Search customers…">
+                  <SelectContent onServerSearch={searchCustomers} searchable searchPlaceholder="Search customers…">
                     {customers.length === 0 ? (
                       <SelectEmptyState
                         message="No customers found"

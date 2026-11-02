@@ -13,6 +13,7 @@ import { SelectEmptyState } from '@/components/shared/SelectEmptyState';
 import { CurrencySelect } from '@/components/ui/currency-select';
 import { LineItemGrid, LineItemRow, calculateLineSummary } from '@/components/invoicing/LineItemGrid';
 import api from '@/lib/api';
+import { useServerOptionSearch } from '@/hooks/useServerOptionSearch';
 import { Customer } from '@/types';
 import { formatCurrency } from '@/lib/utils';
 import { showApiError, showApiSuccess } from '@/lib/apiError';
@@ -25,6 +26,7 @@ const initialRows: LineItemRow[] = [
 export default function NewSalesInvoicePage() {
   const router = useRouter();
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const searchCustomers = useServerOptionSearch('/customers', setCustomers, { params: { isActive: true } });
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [sourceOrder, setSourceOrder] = useState<any>(null);
@@ -188,7 +190,7 @@ export default function NewSalesInvoicePage() {
                 <SelectTrigger>
                   <SelectValue placeholder="Select customer" />
                 </SelectTrigger>
-                <SelectContent searchable searchPlaceholder="Search customers…">
+                <SelectContent onServerSearch={searchCustomers} searchable searchPlaceholder="Search customers…">
                   {customers.length === 0 ? (
                     <SelectEmptyState
                       message="No customers found"

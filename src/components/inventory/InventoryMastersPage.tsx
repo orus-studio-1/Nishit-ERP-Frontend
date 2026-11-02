@@ -4,17 +4,20 @@ import { useCallback, useEffect, useState } from 'react';
 import { Pencil, Plus, Trash2, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '@/lib/api';
+import { useServerOptionSearch } from '@/hooks/useServerOptionSearch';
 import { showApiError, showApiSuccess } from '@/lib/apiError';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 type Row = Record<string, any>;
 const itemsOf = (response: any) => response?.data?.data?.items || response?.data?.data || [];
 
-function NativeSelect({ value, onChange, label, options, disabled }: { value: string; onChange: (value: string) => void; label: string; options: Array<{ id: string; label: string }>; disabled?: boolean }) {
+function NativeSelect({ value, onChange, label, options, disabled, onServerSearch }: { value: string; onChange: (value: string) => void; label: string; options: Array<{ id: string; label: string }>; disabled?: boolean; onServerSearch?: (query: string) => Promise<void> }) {
+  if (onServerSearch) return <div className="space-y-1.5"><Label>{label}</Label><Select value={value} onValueChange={onChange} disabled={disabled}><SelectTrigger className="h-10"><SelectValue placeholder={`Select ${label.toLowerCase()}`} /></SelectTrigger><SelectContent onServerSearch={onServerSearch} searchPlaceholder={`Search ${label.toLowerCase()}…`}>{options.map(option => <SelectItem key={option.id} value={option.id}>{option.label}</SelectItem>)}</SelectContent></Select></div>;
   return <div className="space-y-1.5"><Label>{label}</Label><select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled}><option value="">Select {label.toLowerCase()}</option>{options.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div>;
 }
 
@@ -29,6 +32,7 @@ export function InventoryMastersPage() {
   const [batches, setBatches] = useState<Row[]>([]);
   const [serials, setSerials] = useState<Row[]>([]);
   const [products, setProducts] = useState<Row[]>([]);
+  const searchProducts = useServerOptionSearch('/inventory/products', setProducts);
   const [warehouses, setWarehouses] = useState<Row[]>([]);
   const [busy, setBusy] = useState('');
   const [unit, setUnit] = useState({ name: '', symbol: '' });
@@ -93,7 +97,7 @@ export function InventoryMastersPage() {
       </CardContent></Card>
 
       <Card><CardHeader><CardTitle>UOM Conversions</CardTitle><CardDescription>Define product-specific conversions, for example 1 Box = 20 Pieces.</CardDescription></CardHeader><CardContent className="space-y-2">
-        <NativeSelect label="Product" value={conversion.productId} onChange={productId => setConversion({ ...conversion, productId })} options={productOptions} />
+        <NativeSelect label="Product" value={conversion.productId} onChange={productId => setConversion({ ...conversion, productId })} options={productOptions} onServerSearch={searchProducts} />
         <div className="grid grid-cols-2 gap-2"><NativeSelect label="From unit" value={conversion.fromUnitId} onChange={fromUnitId => setConversion({ ...conversion, fromUnitId })} options={unitOptions} /><NativeSelect label="To unit" value={conversion.toUnitId} onChange={toUnitId => setConversion({ ...conversion, toUnitId })} options={unitOptions} /></div>
         <Input type="number" min="0.000001" step="any" placeholder="Conversion factor" value={conversion.factor} onChange={e => setConversion({ ...conversion, factor: e.target.value })} />
         <Button disabled={!conversion.productId || !conversion.fromUnitId || !conversion.toUnitId || !Number(conversion.factor) || conversion.fromUnitId === conversion.toUnitId || !!busy} onClick={() => submit('conversion', '/inventory/uom-conversions', { ...conversion, factor: Number(conversion.factor) }, () => setConversion({ productId: '', fromUnitId: '', toUnitId: '', factor: '' }), 'UOM conversion created')}>Add Conversion</Button>
@@ -101,7 +105,7 @@ export function InventoryMastersPage() {
       </CardContent></Card>
 
       <Card><CardHeader><CardTitle>Batch Master</CardTitle><CardDescription>Create opening or externally supplied batches. Transaction-created batches also appear here.</CardDescription></CardHeader><CardContent className="space-y-2">
-        <div className="grid grid-cols-2 gap-2"><NativeSelect label="Product" value={batch.productId} onChange={productId => setBatch({ ...batch, productId })} options={productOptions} /><NativeSelect label="Warehouse" value={batch.warehouseId} onChange={warehouseId => setBatch({ ...batch, warehouseId })} options={warehouseOptions} /></div>
+        <div className="grid grid-cols-2 gap-2"><NativeSelect label="Product" value={batch.productId} onChange={productId => setBatch({ ...batch, productId })} options={productOptions} onServerSearch={searchProducts} /><NativeSelect label="Warehouse" value={batch.warehouseId} onChange={warehouseId => setBatch({ ...batch, warehouseId })} options={warehouseOptions} /></div>
         <div className="grid grid-cols-2 gap-2"><Input placeholder="Batch number" value={batch.batchNo} onChange={e => setBatch({ ...batch, batchNo: e.target.value })} /><Input type="number" min="0" placeholder="Opening quantity" value={batch.quantity} onChange={e => setBatch({ ...batch, quantity: e.target.value })} /></div>
         <div className="grid grid-cols-2 gap-2"><div><Label>Manufacturing date</Label><Input type="date" value={batch.manufacturingDate} onChange={e => setBatch({ ...batch, manufacturingDate: e.target.value })} /></div><div><Label>Expiry date</Label><Input type="date" value={batch.expiryDate} onChange={e => setBatch({ ...batch, expiryDate: e.target.value })} /></div></div>
         <Button disabled={!batch.batchNo.trim() || !batch.productId || !!busy} onClick={() => submit('batch', '/inventory/batches', { ...batch, warehouseId: batch.warehouseId || undefined, quantity: Number(batch.quantity || 0), manufacturingDate: batch.manufacturingDate || undefined, expiryDate: batch.expiryDate || undefined }, () => setBatch({ batchNo: '', productId: '', warehouseId: '', quantity: '0', manufacturingDate: '', expiryDate: '', supplierBatchNo: '' }), 'Batch created')}>Add Batch</Button>
@@ -109,7 +113,7 @@ export function InventoryMastersPage() {
       </CardContent></Card>
 
       <Card className="xl:col-span-2"><CardHeader><CardTitle>Serial Number Master</CardTitle><CardDescription>Create and view serial-controlled inventory identifiers.</CardDescription></CardHeader><CardContent className="space-y-2">
-        <div className="grid gap-2 md:grid-cols-4"><NativeSelect label="Product" value={serial.productId} onChange={productId => setSerial({ ...serial, productId, batchId: '' })} options={productOptions} /><NativeSelect label="Warehouse" value={serial.warehouseId} onChange={warehouseId => setSerial({ ...serial, warehouseId })} options={warehouseOptions} /><div className="space-y-1.5"><Label>Serial number</Label><Input value={serial.serialNo} onChange={e => setSerial({ ...serial, serialNo: e.target.value })} /></div><div className="space-y-1.5"><Label>Purchase rate</Label><Input type="number" min="0" value={serial.purchaseRate} onChange={e => setSerial({ ...serial, purchaseRate: e.target.value })} /></div></div>
+        <div className="grid gap-2 md:grid-cols-4"><NativeSelect label="Product" value={serial.productId} onChange={productId => setSerial({ ...serial, productId, batchId: '' })} options={productOptions} onServerSearch={searchProducts} /><NativeSelect label="Warehouse" value={serial.warehouseId} onChange={warehouseId => setSerial({ ...serial, warehouseId })} options={warehouseOptions} /><div className="space-y-1.5"><Label>Serial number</Label><Input value={serial.serialNo} onChange={e => setSerial({ ...serial, serialNo: e.target.value })} /></div><div className="space-y-1.5"><Label>Purchase rate</Label><Input type="number" min="0" value={serial.purchaseRate} onChange={e => setSerial({ ...serial, purchaseRate: e.target.value })} /></div></div>
         <NativeSelect label="Batch (optional)" value={serial.batchId} onChange={batchId => setSerial({ ...serial, batchId })} options={batches.filter(row => row.productId === serial.productId).map(row => ({ id: row.id, label: row.batchNo }))} />
         <Button disabled={!serial.serialNo.trim() || !serial.productId || !!busy} onClick={() => submit('serial number', '/inventory/serial-numbers', { ...serial, warehouseId: serial.warehouseId || undefined, batchId: serial.batchId || undefined, purchaseRate: serial.purchaseRate ? Number(serial.purchaseRate) : undefined }, () => setSerial({ serialNo: '', productId: '', warehouseId: '', batchId: '', purchaseRate: '' }), 'Serial number created')}>Add Serial Number</Button>
         <Records empty={!serials.length}>{serials.map(row => <div key={row.id} className="rounded border p-2 text-sm"><span className="font-mono font-medium">{row.serialNo}</span><span className="text-muted-foreground"> · {row.product?.name} · {row.warehouse?.name || 'No warehouse'} · {row.status}</span></div>)}</Records>

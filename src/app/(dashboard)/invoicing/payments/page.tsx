@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { EmptyState } from '@/components/shared/EmptyState';
 import { SelectEmptyState } from '@/components/shared/SelectEmptyState';
 import api from '@/lib/api';
+import { useServerOptionSearch } from '@/hooks/useServerOptionSearch';
 import { Payment, SalesInvoice } from '@/types';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { showApiError, showApiSuccess } from '@/lib/apiError';
@@ -25,6 +26,7 @@ const methods = ['CASH', 'BANK_TRANSFER', 'UPI', 'CREDIT_CARD', 'CHEQUE', 'ONLIN
 export default function PaymentsPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [invoices, setInvoices] = useState<SalesInvoice[]>([]);
+  const searchInvoices = useServerOptionSearch('/invoicing/sales-invoices', setInvoices, { accept: (i) => !['DRAFT', 'CANCELLED', 'PAID'].includes(i.status) && Number(i.outstandingAmount ?? Number(i.total || 0) - Number(i.amountPaid || 0)) > 0 });
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
@@ -196,7 +198,7 @@ export default function PaymentsPage() {
                 <SelectTrigger>
                   <SelectValue placeholder="Select invoice" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent onServerSearch={searchInvoices} searchPlaceholder="Search invoices…">
                   {invoices.length === 0 ? (
                     <SelectEmptyState
                       message="No unpaid invoices found"

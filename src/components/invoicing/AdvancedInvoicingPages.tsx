@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ClipboardList, PackageCheck, Play, Plus, Trash2, Truck } from 'lucide-react';
 import api from '@/lib/api';
+import { useServerOptionSearch } from '@/hooks/useServerOptionSearch';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -28,7 +29,11 @@ function items(payload: any) {
 export function PaymentEntriesPage() {
   const entryList = usePaginatedList<any>('/payments/entries', {}, [], { errorMessage: 'Failed to load payment entries' });
   const [invoices, setInvoices] = useState<any[]>([]);
+  const searchInvoices = useServerOptionSearch<any>('/invoices', setInvoices, {
+    accept: (invoice) => invoice.status !== 'DRAFT' && invoice.status !== 'CANCELLED' && Number(invoice.outstandingAmount || invoice.total - invoice.amountPaid) > 0,
+  });
   const [customers, setCustomers] = useState<any[]>([]);
+  const searchCustomers = useServerOptionSearch('/customers', setCustomers, { params: { isActive: true } });
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [open, setOpen] = useState(false);
@@ -191,7 +196,7 @@ export function PaymentEntriesPage() {
                   <SelectTrigger>
                     <SelectValue placeholder="Select customer" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent onServerSearch={searchCustomers} searchPlaceholder="Search customers…">
                     {customers.length === 0 ? (
                       <SelectEmptyState
                         message="No customers found"
@@ -260,7 +265,7 @@ export function PaymentEntriesPage() {
                   <SelectTrigger>
                     <SelectValue placeholder="Optional invoice allocation" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent onServerSearch={searchInvoices} searchPlaceholder="Search invoices…">
                     {invoices.length === 0 ? (
                       <SelectEmptyState
                         message="No open invoices found"
@@ -306,9 +311,11 @@ export function DeliveryNotesPage() {
   const requestedOrderApplied = useRef(false);
   const noteList = usePaginatedList<any>('/delivery-notes', {}, [], { errorMessage: 'Failed to load delivery notes' });
   const [customers, setCustomers] = useState<any[]>([]);
+  const searchCustomers = useServerOptionSearch('/customers', setCustomers, { params: { isActive: true } });
   const [orders, setOrders] = useState<any[]>([]);
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
+  const searchProducts = useServerOptionSearch<any>('/inventory/products', setProducts, { params: { isActive: true }, accept: (product) => product.type !== 'SERVICE' });
   const [isLoading, setIsLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
@@ -568,7 +575,7 @@ export function DeliveryNotesPage() {
                   <SelectTrigger>
                     <SelectValue placeholder="Select customer" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent onServerSearch={searchCustomers} searchPlaceholder="Search customers…">
                     {customers.length === 0 ? (
                       <SelectEmptyState
                         message="No customers found"
@@ -641,7 +648,7 @@ export function DeliveryNotesPage() {
               </div>
             )}
 
-            <DeliveryRows rows={deliveryRows} products={products} warehouses={warehouses} fromOrder={Boolean(form.salesOrderId)} onChange={setDeliveryRows} />
+            <DeliveryRows searchProducts={searchProducts} rows={deliveryRows} products={products} warehouses={warehouses} fromOrder={Boolean(form.salesOrderId)} onChange={setDeliveryRows} />
 
             {form.salesOrderId && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.sendEmailApproved} onChange={(event) => setForm((prev) => ({ ...prev, sendEmailApproved: event.target.checked }))} />Approve dispatch email to the entered customer email</label>}
 
@@ -685,7 +692,7 @@ function DeliveryTrackingWorkspace({ note, order: listedOrder, orderNotes, onClo
   </div></DialogContent></Dialog>;
 }
 
-function DeliveryRows({ rows, products, warehouses = [], fromOrder = false, onChange }: { rows: any[]; products: any[]; warehouses?: any[]; fromOrder?: boolean; onChange: (rows: any[]) => void }) {
+function DeliveryRows({ searchProducts, rows, products, warehouses = [], fromOrder = false, onChange }: { searchProducts: (query: string) => Promise<void>; rows: any[]; products: any[]; warehouses?: any[]; fromOrder?: boolean; onChange: (rows: any[]) => void }) {
   const update = (index: number, patch: any) =>
     onChange(rows.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   const add = () => onChange([...rows, { productId: '', description: '', quantity: 1 }]);
@@ -717,7 +724,7 @@ function DeliveryRows({ rows, products, warehouses = [], fromOrder = false, onCh
               <SelectTrigger>
                 <SelectValue placeholder="Select product" />
               </SelectTrigger>
-              <SelectContent searchable searchPlaceholder="Search products…">
+              <SelectContent onServerSearch={searchProducts} searchable searchPlaceholder="Search products…">
                 {products.length === 0 ? (
                   <SelectEmptyState
                     message="No products found"

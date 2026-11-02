@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AlertCircle, ArrowUpRight, Plus } from 'lucide-react';
 import api from '@/lib/api';
+import { useServerOptionSearch } from '@/hooks/useServerOptionSearch';
 import { Product, StockEntry, Warehouse } from '@/types';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
@@ -35,6 +36,7 @@ const emptyStockRow = () => ({ productId: '', warehouseId: '', quantity: 1, valu
 export default function StockEntriesPage() {
   const entryList = usePaginatedList<StockEntry>('/inventory/stock-entries', {}, [], { errorMessage: 'Failed to load stock entries' });
   const [products, setProducts] = useState<Product[]>([]);
+  const searchProducts = useServerOptionSearch('/inventory/products', setProducts, { params: { type: 'PRODUCT' } });
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [batches, setBatches] = useState<any[]>([]);
   const [serials, setSerials] = useState<any[]>([]);
@@ -303,7 +305,7 @@ export default function StockEntriesPage() {
                           <SelectTrigger>
                             <SelectValue placeholder="Select product" />
                           </SelectTrigger>
-                          <SelectContent searchable searchPlaceholder="Search products…">
+                          <SelectContent onServerSearch={searchProducts} searchable searchPlaceholder="Search products…">
                             {products.length === 0 ? (
                               <SelectEmptyState
                                 message="No products found"

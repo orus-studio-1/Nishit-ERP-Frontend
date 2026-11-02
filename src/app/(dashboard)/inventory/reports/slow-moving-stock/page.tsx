@@ -4,6 +4,7 @@ import { ReactNode, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Plus } from 'lucide-react';
 import api from '@/lib/api';
+import { useServerOptionSearch } from '@/hooks/useServerOptionSearch';
 import { Product, Warehouse } from '@/types';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
@@ -19,6 +20,7 @@ import { showApiError, showApiSuccess } from '@/lib/apiError';
 export default function SlowMovingStockPage() {
   const [rows, setRows] = useState<any[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const searchProducts = useServerOptionSearch('/inventory/products', setProducts, { params: { type: 'PRODUCT' } });
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [days, setDays] = useState(90);
   const [open, setOpen] = useState(false);
@@ -153,7 +155,7 @@ export default function SlowMovingStockPage() {
                 <SelectTrigger>
                   <SelectValue placeholder="Select product" />
                 </SelectTrigger>
-                <SelectContent searchable searchPlaceholder="Search products…">
+                <SelectContent onServerSearch={searchProducts} searchable searchPlaceholder="Search products…">
                   {products.length === 0 ? (
                     <SelectEmptyState
                       message="No products found"

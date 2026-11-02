@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '@/lib/api';
+import { useServerOptionSearch } from '@/hooks/useServerOptionSearch';
 import { Pagination } from '@/components/shared/Pagination';
 import { useClientPagination } from '@/hooks/useClientPagination';
 import { Button } from '@/components/ui/button';
@@ -174,6 +175,9 @@ export function ProcurementPage({ kind }: { kind: ProcurementKind }) {
   const [orders, setOrders] = useState<any[]>([]);
   const [receipts, setReceipts] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
+  const searchInvoices = useServerOptionSearch('/procurement/purchase-invoices', setInvoices);
+  const searchSuppliers = useServerOptionSearch('/suppliers', setSuppliers);
+  const searchProducts = useServerOptionSearch('/inventory/products', setProducts);
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -451,6 +455,9 @@ export function ProcurementPage({ kind }: { kind: ProcurementKind }) {
 
           <form onSubmit={create} className="space-y-4">
             <DocumentFields
+              searchSuppliers={searchSuppliers}
+              searchProducts={searchProducts}
+              searchInvoices={searchInvoices}
               kind={kind}
               form={form}
               setForm={setForm}
@@ -464,6 +471,7 @@ export function ProcurementPage({ kind }: { kind: ProcurementKind }) {
             />
             {needsLines(kind) && (
               <LineEditor
+                searchProducts={searchProducts}
                 kind={kind}
                 lines={lines}
                 setLines={setLines}
@@ -823,7 +831,7 @@ function Tracker({ rows, loading }: any) {
     </div>
   );
 }
-function DocumentFields({ kind, form, setForm, suppliers, products, orders, receipts, invoices, warehouses, setLines }: any) {
+function DocumentFields({ searchSuppliers, searchProducts, searchInvoices, kind, form, setForm, suppliers, products, orders, receipts, invoices, warehouses, setLines }: any) {
   return (
     <div className="grid gap-3 rounded-md border border-[#e5e2dc] bg-[#fbfaf8] p-3 md:grid-cols-4">
       {usesSupplier(kind) && (
@@ -836,7 +844,7 @@ function DocumentFields({ kind, form, setForm, suppliers, products, orders, rece
             <SelectTrigger>
               <SelectValue placeholder="Select supplier" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent onServerSearch={searchSuppliers} searchPlaceholder="Search suppliers…">
               {suppliers.length === 0 ? (
                 <SelectEmptyState
                   message="No suppliers found"
@@ -894,7 +902,7 @@ function DocumentFields({ kind, form, setForm, suppliers, products, orders, rece
               <SelectTrigger>
                 <SelectValue placeholder="Select supplier" />
               </SelectTrigger>
-              <SelectContent searchable searchPlaceholder="Search products…">
+              <SelectContent onServerSearch={searchSuppliers} searchable searchPlaceholder="Search products…">
                 {suppliers.length === 0 ? (
                   <SelectEmptyState
                     message="No suppliers found"
@@ -920,7 +928,7 @@ function DocumentFields({ kind, form, setForm, suppliers, products, orders, rece
               <SelectTrigger>
                 <SelectValue placeholder="Select item" />
               </SelectTrigger>
-              <SelectContent searchable searchPlaceholder="Search products…">
+              <SelectContent onServerSearch={searchProducts} searchable searchPlaceholder="Search products…">
                 {products.length === 0 ? (
                   <SelectEmptyState
                     message="No products found"
@@ -965,7 +973,7 @@ function DocumentFields({ kind, form, setForm, suppliers, products, orders, rece
               <SelectTrigger>
                 <SelectValue placeholder="Select supplier" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent onServerSearch={searchSuppliers} searchPlaceholder="Search suppliers…">
                 {suppliers.length === 0 ? (
                   <SelectEmptyState
                     message="No suppliers found"
@@ -1164,7 +1172,7 @@ function DocumentFields({ kind, form, setForm, suppliers, products, orders, rece
               <SelectTrigger>
                 <SelectValue placeholder={form.type === 'ADVANCE' ? 'Advance / unallocated' : 'Select invoice'} />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent onServerSearch={searchInvoices} searchPlaceholder="Search invoices…">
                 {invoices.length === 0 ? (
                   <SelectEmptyState
                     message="No unpaid invoices found"
@@ -1441,7 +1449,7 @@ function PaymentTermEditor({ lines, setLines }: any) {
   );
 }
 
-function LineEditor({ kind, lines, setLines, products, total, currency }: any) {
+function LineEditor({ searchProducts, kind, lines, setLines, products, total, currency }: any) {
   return (
     <div className="space-y-3 rounded-md border border-[#e5e2dc] bg-white p-3">
       <div className="flex items-center justify-between">
@@ -1468,7 +1476,7 @@ function LineEditor({ kind, lines, setLines, products, total, currency }: any) {
               <SelectTrigger className="h-9 bg-white text-xs">
                 <SelectValue placeholder="Search and select item" />
               </SelectTrigger>
-              <SelectContent searchable searchPlaceholder="Search products…">
+              <SelectContent onServerSearch={searchProducts} searchable searchPlaceholder="Search products…">
                 {products.length === 0 ? (
                   <SelectEmptyState
                     message="No products found"

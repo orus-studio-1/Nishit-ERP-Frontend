@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Search, SlidersHorizontal } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '@/lib/api';
+import { useServerOptionSearch } from '@/hooks/useServerOptionSearch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DataTable } from '@/components/shared/DataTable';
 import { Button } from '@/components/ui/button';
@@ -41,6 +42,7 @@ export function ReportWorkbench({
   const [rows, setRows] = useState<any[]>([]);
   const [totals, setTotals] = useState<any>({});
   const [customers, setCustomers] = useState<any[]>([]);
+  const searchCustomers = useServerOptionSearch('/customers', setCustomers, { params: { isActive: true } });
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState({
     search: '',
@@ -110,7 +112,7 @@ export function ReportWorkbench({
             {filterConfig.customer && (
               <Select value={filter.customerId} onValueChange={customerId => setFilter(prev => ({ ...prev, customerId }))}>
                 <SelectTrigger><SelectValue placeholder="Customer" /></SelectTrigger>
-                <SelectContent searchable searchPlaceholder="Search customers…"><SelectItem value="ALL">All customers</SelectItem>{customers.map(customer => <SelectItem key={customer.id} value={customer.id}>{customer.name}</SelectItem>)}</SelectContent>
+                <SelectContent onServerSearch={searchCustomers} searchable searchPlaceholder="Search customers…"><SelectItem value="ALL">All customers</SelectItem>{customers.map(customer => <SelectItem key={customer.id} value={customer.id}>{customer.name}</SelectItem>)}</SelectContent>
               </Select>
             )}
             {filterConfig.dateRange && (

@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { EmptyState } from '@/components/shared/EmptyState';
 import { LineItemGrid, LineItemRow } from '@/components/invoicing/LineItemGrid';
 import api from '@/lib/api';
+import { useServerOptionSearch } from '@/hooks/useServerOptionSearch';
 import { SalesOrder } from '@/types';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { showApiError, showApiSuccess } from '@/lib/apiError';
@@ -26,6 +27,7 @@ export default function SalesOrdersPage() {
   const router = useRouter();
   const [orders, setOrders] = useState<SalesOrder[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
+  const searchCustomers = useServerOptionSearch('/customers', setCustomers, { params: { isActive: true } });
   const [sourceOrder, setSourceOrder] = useState<SalesOrder | null>(null);
   const [deliveryOrder, setDeliveryOrder] = useState<SalesOrder | null>(null);
   const [shippingOrder, setShippingOrder] = useState<SalesOrder | null>(null);
@@ -457,7 +459,7 @@ export default function SalesOrdersPage() {
                   <SelectTrigger>
                     <SelectValue placeholder="Select customer" />
                   </SelectTrigger>
-                  <SelectContent searchable searchPlaceholder="Search customers…">
+                  <SelectContent onServerSearch={searchCustomers} searchable searchPlaceholder="Search customers…">
                     {customers.length === 0 ? (
                       <SelectEmptyState
                         message="No customers found"

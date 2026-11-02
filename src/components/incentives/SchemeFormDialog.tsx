@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { Plus, Trash2 } from 'lucide-react';
 import api from '@/lib/api';
+import { useServerOptionSearch } from '@/hooks/useServerOptionSearch';
 import { useDialogForm } from '@/hooks/useDialogForm';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -89,6 +90,7 @@ function SchemeFormDialogForm({ scheme, onClose, onSaved }: SchemeFormDialogProp
 
   const [suppliers, setSuppliers] = useState<Array<{ id: string; name: string }>>([]);
   const [products, setProducts] = useState<Array<{ id: string; name: string; sku: string }>>([]);
+  const searchProducts = useServerOptionSearch('/inventory/products', setProducts);
   const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
   const [branches, setBranches] = useState<Array<{ id: string; name: string }>>([]);
 
@@ -300,6 +302,7 @@ function SchemeFormDialogForm({ scheme, onClose, onSaved }: SchemeFormDialogProp
               placeholder="Select products…"
               searchPlaceholder="Search products…"
               options={products.map(p => ({ value: p.id, label: `${p.name} (${p.sku})` }))}
+              onServerSearch={searchProducts}
               value={form.rewardExcludedProductIds}
               onChange={(v) => set({ rewardExcludedProductIds: v })}
             />

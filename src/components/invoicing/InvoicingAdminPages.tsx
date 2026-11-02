@@ -20,6 +20,7 @@ import { showApiError, showApiSuccess } from '@/lib/apiError';
 import { Pagination } from '@/components/shared/Pagination';
 import { usePaginatedList } from '@/hooks/usePaginatedList';
 import api from '@/lib/api';
+import { useServerOptionSearch } from '@/hooks/useServerOptionSearch';
 import toast from 'react-hot-toast';
 import { RecurringRunnerButton } from './AdvancedInvoicingPages';
 import { LineItemGrid, LineItemRow, calculateLineSummary } from './LineItemGrid';
@@ -326,6 +327,7 @@ export function TaxTemplatesPage() {
 export function CreditNotesPage() {
   const noteList = usePaginatedList<any>('/invoicing/credit-notes', {}, [], { errorMessage: 'Failed to load credit notes' });
   const [invoices, setInvoices] = useState<any[]>([]);
+  const searchInvoices = useServerOptionSearch<any>('/invoices', setInvoices, { accept: (invoice) => !['DRAFT', 'CANCELLED'].includes(invoice.status) });
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [open, setOpen] = useState(false);
@@ -516,7 +518,7 @@ export function CreditNotesPage() {
                   <SelectTrigger>
                     <SelectValue placeholder="Select submitted invoice" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent onServerSearch={searchInvoices} searchPlaceholder="Search invoices…">
                     {invoices.length === 0 ? (
                       <SelectEmptyState
                         message="No submitted invoices found"
@@ -902,6 +904,7 @@ export function PrintFormatsPage() {
 export function SubscriptionsPage() {
   const [subscriptions, setSubscriptions] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
+  const searchCustomers = useServerOptionSearch('/customers', setCustomers, { params: { isActive: true } });
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [open, setOpen] = useState(false);
@@ -1088,7 +1091,7 @@ export function SubscriptionsPage() {
                   <SelectTrigger>
                     <SelectValue placeholder="Select customer" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent onServerSearch={searchCustomers} searchPlaceholder="Search customers…">
                     {customers.length === 0 ? (
                       <SelectEmptyState
                         message="No customers found"

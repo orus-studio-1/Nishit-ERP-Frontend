@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { EmptyState } from '@/components/shared/EmptyState';
 import { Textarea } from '@/components/ui/textarea';
 import api from '@/lib/api';
+import { useServerOptionSearch } from '@/hooks/useServerOptionSearch';
 import { StockMovement, Product, Warehouse } from '@/types';
 import { formatDate } from '@/lib/utils';
 import { showApiError, showApiSuccess } from '@/lib/apiError';
@@ -26,6 +27,7 @@ const movTypes = ['IN', 'OUT', 'TRANSFER', 'ADJUSTMENT', 'RETURN'];
 export default function StockMovementsPage() {
   const [movements, setMovements] = useState<StockMovement[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const searchProducts = useServerOptionSearch('/inventory/products', setProducts);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -226,7 +228,7 @@ export default function StockMovementsPage() {
                 <SelectTrigger>
                   <SelectValue placeholder="Select product" />
                 </SelectTrigger>
-                <SelectContent searchable searchPlaceholder="Search products…">
+                <SelectContent onServerSearch={searchProducts} searchable searchPlaceholder="Search products…">
                   {products.length === 0 ? (
                     <SelectEmptyState
                       message="No products found"

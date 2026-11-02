@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Plus, Tags } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '@/lib/api';
+import { useServerOptionSearch } from '@/hooks/useServerOptionSearch';
 import { ItemPrice, PriceList, PricingRule, Product } from '@/types';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
@@ -24,6 +25,7 @@ export default function InventoryPricingPage() {
   const priceList = usePaginatedList<ItemPrice>('/inventory/item-prices', {}, [], { errorMessage: 'Failed to load item prices' });
   const [rules, setRules] = useState<PricingRule[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const searchProducts = useServerOptionSearch('/inventory/products', setProducts);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmittingPL, setIsSubmittingPL] = useState(false);
   const [isSubmittingIP, setIsSubmittingIP] = useState(false);
@@ -194,6 +196,7 @@ export default function InventoryPricingPage() {
             <ProductSelect
               value={itemPriceForm.productId}
               products={products}
+              onServerSearch={searchProducts}
               onChange={(productId) => setItemPriceForm((f) => ({ ...f, productId }))}
             />
             <PriceListSelect
@@ -251,6 +254,7 @@ export default function InventoryPricingPage() {
             <ProductSelect
               value={ruleForm.productId}
               products={products}
+              onServerSearch={searchProducts}
               onChange={(productId) => setRuleForm((f) => ({ ...f, productId }))}
             />
             <PriceListSelect
@@ -334,12 +338,14 @@ export default function InventoryPricingPage() {
 }
 
 function ProductSelect({
+  onServerSearch,
   value,
   products,
   onChange,
 }: {
   value: string;
   products: Product[];
+  onServerSearch: (query: string) => Promise<void>;
   onChange: (value: string) => void;
 }) {
   return (
@@ -349,7 +355,7 @@ function ProductSelect({
         <SelectTrigger>
           <SelectValue placeholder="Select product" />
         </SelectTrigger>
-        <SelectContent searchable searchPlaceholder="Search products…">
+        <SelectContent onServerSearch={onServerSearch} searchable searchPlaceholder="Search products…">
           {products.length === 0 ? (
             <SelectEmptyState
               message="No products found"

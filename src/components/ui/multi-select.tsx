@@ -4,6 +4,7 @@ import * as PopoverPrimitive from '@radix-ui/react-popover';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { ChevronDown, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useDebouncedServerSearch } from '@/hooks/useServerOptionSearch';
 
 const ROW_HEIGHT = 30;
 /** Below this many rows, plain rendering is simpler and just as fast — virtualize only long lists. */
@@ -23,14 +24,17 @@ interface MultiSelectProps {
   disabled?: boolean;
   className?: string;
   emptyText?: string;
+  /** Also looks up what's typed on the server, for lists that only hold their first page. */
+  onServerSearch?: (query: string) => Promise<void>;
 }
 
 /** Dropdown multi-select: closed by default, trigger shows a "N selected" summary instead of
  * an always-expanded checklist. Styled to match the single-select Select component. */
 export function MultiSelect({
   options, value, onChange, placeholder = 'Select…', searchPlaceholder = 'Search…',
-  disabled, className, emptyText = 'No options available',
+  disabled, className, emptyText = 'No options available', onServerSearch,
 }: MultiSelectProps) {
+  const { searching, search } = useDebouncedServerSearch(onServerSearch);
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
   const normalizedQuery = query.trim().toLocaleLowerCase();
@@ -88,7 +92,7 @@ export function MultiSelect({
               className="h-8 w-full rounded-md border border-[#d9d4cc] bg-white pl-8 pr-2 text-sm outline-none placeholder:text-[#9aa3af] focus:border-[#2490ef] focus:ring-2 focus:ring-[#2490ef]/15"
               placeholder={searchPlaceholder}
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => { setQuery(e.target.value); search(e.target.value); }}
             />
           </div>
           {value.length > 0 && (
@@ -102,7 +106,7 @@ export function MultiSelect({
           )}
           <div ref={listRef} className="max-h-64 overflow-y-auto p-1">
             {filtered.length === 0 ? (
-              <div className="px-3 py-6 text-center text-sm text-[#6b7280]">{options.length === 0 ? emptyText : 'No matching options'}</div>
+              <div className="px-3 py-6 text-center text-sm text-[#6b7280]">{searching ? 'Searching…' : options.length === 0 ? emptyText : 'No matching options'}</div>
             ) : shouldVirtualize ? (
               <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
                 {virtualizer.getVirtualItems().map((row) => {
