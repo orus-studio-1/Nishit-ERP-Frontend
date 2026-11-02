@@ -16,6 +16,8 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 import { showApiError, showApiSuccess } from '@/lib/apiError';
 import { DeskPage, Field } from './AdvancedInvoicingShell';
 import toast from 'react-hot-toast';
+import { Pagination } from '@/components/shared/Pagination';
+import { usePaginatedList } from '@/hooks/usePaginatedList';
 
 function items(payload: any) {
   if (Array.isArray(payload?.data?.items)) return payload.data.items;
@@ -23,12 +25,8 @@ function items(payload: any) {
   return [];
 }
 
-function total(payload: any) {
-  return payload?.data?.total || payload?.data?.pagination?.total || items(payload).length;
-}
-
 export function PaymentEntriesPage() {
-  const [entries, setEntries] = useState<any[]>([]);
+  const entryList = usePaginatedList<any>('/payments/entries', {}, [], { errorMessage: 'Failed to load payment entries' });
   const [invoices, setInvoices] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -46,12 +44,10 @@ export function PaymentEntriesPage() {
   const load = async () => {
     setIsLoading(true);
     try {
-      const [entryRes, invoiceRes, customerRes] = await Promise.all([
-        api.get('/payments/entries'),
+      const [invoiceRes, customerRes] = await Promise.all([
         api.get('/invoices', { params: { limit: 200 } }),
         api.get('/customers', { params: { limit: 200 } }),
       ]);
-      setEntries(items(entryRes.data));
       const openInvoices = items(invoiceRes.data).filter(
         (invoice: any) =>
           invoice.status !== 'DRAFT' &&
@@ -66,6 +62,8 @@ export function PaymentEntriesPage() {
       setIsLoading(false);
     }
   };
+
+  const refresh = () => { load(); entryList.refresh(); };
 
   useEffect(() => {
     load();
@@ -106,7 +104,7 @@ export function PaymentEntriesPage() {
       showApiSuccess('Payment entry drafted');
       setOpen(false);
       setForm({ customerId: '', paidAmount: '', method: 'BANK_TRANSFER', reference: '', invoiceId: '', allocatedAmount: '' });
-      load();
+      refresh();
     } catch (err: any) {
       showApiError(err, 'Failed to create payment entry');
     } finally {
@@ -118,7 +116,7 @@ export function PaymentEntriesPage() {
     try {
       await api.patch(`/payments/entries/${id}/status`, { status });
       showApiSuccess(`Payment entry ${status.toLowerCase()}`);
-      load();
+      refresh();
     } catch (err: any) {
       showApiError(err, 'Failed to update payment entry');
     }
@@ -135,10 +133,11 @@ export function PaymentEntriesPage() {
         </Button>
       }
     >
-      {entries.length || isLoading ? (
+      {entryList.items.length || entryList.isLoading ? (
+      <>
         <DataTable
-          data={entries}
-          isLoading={isLoading}
+          data={entryList.items}
+          isLoading={entryList.isLoading}
           columns={[
             { key: 'paymentNo', header: 'Entry #' },
             { key: 'customer', header: 'Customer', render: (e: any) => e.customer?.name || '-' },
@@ -166,6 +165,8 @@ export function PaymentEntriesPage() {
             },
           ]}
         />
+        {entryList.total > entryList.limit && <Pagination page={entryList.page} totalPages={entryList.totalPages} total={entryList.total} limit={entryList.limit} onPageChange={entryList.setPage} />}
+      </>
       ) : (
         <EmptyState
           icon={ClipboardList}
@@ -303,7 +304,7 @@ export function PaymentEntriesPage() {
 export function DeliveryNotesPage() {
   const [requestedOrderId] = useState(() => typeof window === 'undefined' ? '' : new URLSearchParams(window.location.search).get('salesOrderId') || '');
   const requestedOrderApplied = useRef(false);
-  const [notes, setNotes] = useState<any[]>([]);
+  const noteList = usePaginatedList<any>('/delivery-notes', {}, [], { errorMessage: 'Failed to load delivery notes' });
   const [customers, setCustomers] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [warehouses, setWarehouses] = useState<any[]>([]);
@@ -324,20 +325,16 @@ export function DeliveryNotesPage() {
     sendEmailApproved: true,
   });
   const [deliveryRows, setDeliveryRows] = useState<any[]>([{ productId: '', description: '', quantity: 1 }]);
-  const [totalRows, setTotalRows] = useState(0);
 
   const load = async () => {
     setIsLoading(true);
     try {
-      const [noteRes, customerRes, orderRes, warehouseRes, productRes] = await Promise.all([
-        api.get('/delivery-notes'),
+      const [customerRes, orderRes, warehouseRes, productRes] = await Promise.all([
         api.get('/customers', { params: { limit: 200, isActive: true } }),
         api.get('/sales/orders', { params: { limit: 200 } }),
         api.get('/inventory/warehouses'),
         api.get('/inventory/products', { params: { limit: 200, isActive: true } }),
       ]);
-      setNotes(items(noteRes.data));
-      setTotalRows(total(noteRes.data));
       setCustomers(items(customerRes.data));
       const availableOrders = items(orderRes.data).filter((order: any) => !['DRAFT', 'CANCELLED', 'CLOSED', 'DELIVERED'].includes(order.status));
       const availableWarehouses = items(warehouseRes.data);
@@ -360,6 +357,8 @@ export function DeliveryNotesPage() {
     }
   };
 
+  const refresh = () => { load(); noteList.refresh(); };
+
   useEffect(() => {
     load();
   }, []);
@@ -368,7 +367,7 @@ export function DeliveryNotesPage() {
     try {
       await api.patch(`/delivery-notes/${id}/status`, { status });
       showApiSuccess(`Delivery note ${status.toLowerCase()}`);
-      load();
+      refresh();
     } catch (err: any) {
       showApiError(err, 'Failed to update delivery note');
     }
@@ -401,7 +400,7 @@ export function DeliveryNotesPage() {
       showApiSuccess('Dispatch posted and delivery tracking created');
       setOpen(false);
       resetDeliveryForm();
-      load();
+      refresh();
     } catch (err: any) {
       showApiError(err, 'Failed to create delivery note');
     }
@@ -422,7 +421,7 @@ export function DeliveryNotesPage() {
       showApiSuccess('Draft delivery note created');
       setOpen(false);
       resetDeliveryForm();
-      load();
+      refresh();
     } catch (err: any) {
       showApiError(err, 'Failed to create delivery note');
     }
@@ -445,7 +444,7 @@ export function DeliveryNotesPage() {
     <DeskPage
       title="Delivery Notes"
       description="Draft the shipment, submit when goods leave stock, then invoice from the delivered document."
-      meta={`${totalRows} records`}
+      meta={`${noteList.total} records`}
       action={
         <Button onClick={() => setOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
@@ -453,10 +452,11 @@ export function DeliveryNotesPage() {
         </Button>
       }
     >
-      {notes.length || isLoading ? (
+      {noteList.items.length || noteList.isLoading ? (
+      <>
         <DataTable
-          data={notes}
-          isLoading={isLoading}
+          data={noteList.items}
+          isLoading={noteList.isLoading}
           columns={[
             { key: 'deliveryNo', header: 'Delivery #', render: (n: any) => <Link className="font-mono font-semibold text-blue-600 hover:underline" href={`/invoicing/delivery-notes/${n.id}`}>{n.deliveryNo}</Link> },
             { key: 'customer', header: 'Customer', render: (n: any) => n.customer?.name || '-' },
@@ -495,6 +495,8 @@ export function DeliveryNotesPage() {
             },
           ]}
         />
+        {noteList.total > noteList.limit && <Pagination page={noteList.page} totalPages={noteList.totalPages} total={noteList.total} limit={noteList.limit} onPageChange={noteList.setPage} />}
+      </>
       ) : (
         <EmptyState
           icon={PackageCheck}

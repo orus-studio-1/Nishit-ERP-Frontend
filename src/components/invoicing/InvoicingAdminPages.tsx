@@ -17,6 +17,8 @@ import { StatusBadge } from '@/components/shared/StatusBadge';
 import { CurrencySelect } from '@/components/ui/currency-select';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { showApiError, showApiSuccess } from '@/lib/apiError';
+import { Pagination } from '@/components/shared/Pagination';
+import { usePaginatedList } from '@/hooks/usePaginatedList';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 import { RecurringRunnerButton } from './AdvancedInvoicingPages';
@@ -322,7 +324,7 @@ export function TaxTemplatesPage() {
 }
 
 export function CreditNotesPage() {
-  const [notes, setNotes] = useState<any[]>([]);
+  const noteList = usePaginatedList<any>('/invoicing/credit-notes', {}, [], { errorMessage: 'Failed to load credit notes' });
   const [invoices, setInvoices] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -340,11 +342,7 @@ export function CreditNotesPage() {
   const load = async () => {
     setIsLoading(true);
     try {
-      const [noteRes, invoiceRes] = await Promise.all([
-        api.get('/invoicing/credit-notes'),
-        api.get('/invoices', { params: { limit: 200 } }),
-      ]);
-      setNotes(asItems(noteRes.data));
+      const invoiceRes = await api.get('/invoices', { params: { limit: 200 } });
       setInvoices(asItems(invoiceRes.data).filter((invoice: any) => !['DRAFT', 'CANCELLED'].includes(invoice.status)));
     } catch (err: any) {
       showApiError(err, 'Failed to load credit notes and invoices');
@@ -352,6 +350,8 @@ export function CreditNotesPage() {
       setIsLoading(false);
     }
   };
+
+  const refresh = () => { load(); noteList.refresh(); };
 
   useEffect(() => {
     load();
@@ -416,7 +416,7 @@ export function CreditNotesPage() {
       showApiSuccess('Draft credit note created successfully');
       setOpen(false);
       reset();
-      load();
+      refresh();
     } catch (err: any) {
       showApiError(err, 'Failed to create credit note');
     } finally {
@@ -428,7 +428,7 @@ export function CreditNotesPage() {
     try {
       await api.patch(`/invoicing/credit-notes/${id}/status`, { status });
       showApiSuccess(`Credit note ${status.toLowerCase()}`);
-      load();
+      refresh();
     } catch (err: any) {
       showApiError(err, 'Failed to update credit note');
     }
@@ -441,10 +441,11 @@ export function CreditNotesPage() {
       actionLabel="New Credit Note"
       onAction={() => setOpen(true)}
     >
-      {notes.length || isLoading ? (
+      {noteList.items.length || noteList.isLoading ? (
+      <>
         <DataTable
-          data={notes}
-          isLoading={isLoading}
+          data={noteList.items}
+          isLoading={noteList.isLoading}
           columns={[
             { key: 'creditNoteNo', header: 'Credit Note #' },
             { key: 'customer', header: 'Customer', render: (n: any) => n.customer?.name || '-' },
@@ -473,6 +474,8 @@ export function CreditNotesPage() {
             },
           ]}
         />
+        {noteList.total > noteList.limit && <Pagination page={noteList.page} totalPages={noteList.totalPages} total={noteList.total} limit={noteList.limit} onPageChange={noteList.setPage} />}
+      </>
       ) : (
         <EmptyState
           icon={FileText}

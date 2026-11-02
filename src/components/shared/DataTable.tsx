@@ -1,5 +1,7 @@
 'use client';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Pagination } from '@/components/shared/Pagination';
+import { useClientPagination } from '@/hooks/useClientPagination';
 
 interface Column<T> {
   key: string;
@@ -15,9 +17,13 @@ interface DataTableProps<T> {
   keyField?: string;
   emptyMessage?: string;
   onRowClick?: (item: T) => void;
+  /** Rows per page for data the API returned in full. Pages already paginated by the server pass at most this many rows, so no second pager shows. */
+  pageSize?: number;
 }
 
-export function DataTable<T extends Record<string, any>>({ columns, data, isLoading, keyField = 'id', emptyMessage = 'No records found', onRowClick }: DataTableProps<T>) {
+export function DataTable<T extends Record<string, any>>({ columns, data, isLoading, keyField = 'id', emptyMessage = 'No records found', onRowClick, pageSize = 20 }: DataTableProps<T>) {
+  const pagination = useClientPagination(data, pageSize);
+
   if (isLoading) {
     return (
       <div className="space-y-2">
@@ -29,6 +35,7 @@ export function DataTable<T extends Record<string, any>>({ columns, data, isLoad
   }
 
   return (
+    <>
     <div className="overflow-x-auto rounded-md border border-[#e5e2dc] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
       <table className="w-full text-sm">
         <thead className="border-b border-[#e5e2dc] bg-[#f8faf9]">
@@ -48,7 +55,7 @@ export function DataTable<T extends Record<string, any>>({ columns, data, isLoad
               </td>
             </tr>
           ) : (
-            data.map((item) => (
+            pagination.pageRows.map((item) => (
               <tr
                 key={item[keyField]}
                 className={`transition-colors hover:bg-[#f8faf9] ${onRowClick ? 'cursor-pointer' : ''}`}
@@ -65,5 +72,9 @@ export function DataTable<T extends Record<string, any>>({ columns, data, isLoad
         </tbody>
       </table>
     </div>
+    {pagination.total > pagination.limit && (
+      <Pagination page={pagination.page} totalPages={pagination.totalPages} total={pagination.total} limit={pagination.limit} onPageChange={pagination.setPage} />
+    )}
+    </>
   );
 }

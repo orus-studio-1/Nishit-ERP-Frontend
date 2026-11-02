@@ -53,6 +53,8 @@ export function usePaginatedList<T>(url: string, params: Record<string, unknown>
 
   const changePage = (p: number) => setPage(p);
   const reload = () => { setPage(1); setReloadKey((k) => k + 1); };
+  /** Refetches the current page, for actions on a row that shouldn't send the user back to page 1. */
+  const refresh = () => setReloadKey((k) => k + 1);
 
-  return { items, total, page, setPage: changePage, isLoading, error, reload, totalPages: Math.ceil(total / limit), limit };
+  return { items, total, page, setPage: changePage, isLoading, error, reload, refresh, totalPages: Math.ceil(total / limit), limit };
 }

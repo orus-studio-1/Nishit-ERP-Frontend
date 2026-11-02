@@ -23,6 +23,8 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '@/lib/api';
+import { Pagination } from '@/components/shared/Pagination';
+import { useClientPagination } from '@/hooks/useClientPagination';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -157,9 +159,14 @@ const config: Record<ProcurementKind, { title: string; description: string; endp
 const today = () => new Date().toISOString().slice(0, 10);
 const blankLine = { productId: '', quantity: 1, unitPrice: 0, rate: 0, taxRate: 0, discount: 0, categoryCode: '', hsnCode: '', make: '', quantityTolerance: '', deliveryDate: '', uom: '' };
 
+const PAGE_SIZE = 20;
+
 export function ProcurementPage({ kind }: { kind: ProcurementKind }) {
   const meta = config[kind];
   const [rows, setRows] = useState<any[]>([]);
+  const [page, setPage] = useState(1);
+  const [totalRows, setTotalRows] = useState(0);
+  const serverPaged = kind !== 'settings' && kind !== 'dashboard' && kind !== 'tracker';
   const [dashboard, setDashboard] = useState<any>(null);
   const [settings, setSettings] = useState<any>(null);
   const [suppliers, setSuppliers] = useState<any[]>([]);
@@ -177,30 +184,35 @@ export function ProcurementPage({ kind }: { kind: ProcurementKind }) {
   const [poOperationForm, setPoOperationForm] = useState<any>({});
   const [editRow, setEditRow] = useState<any>(null); // for edit modal
 
-  async function load() {
+  async function loadCommon() {
+    const common = await Promise.allSettled([
+      api.get('/suppliers', { params: { limit: 200 } }),
+      api.get('/inventory/products', { params: { limit: 200 } }),
+      api.get('/procurement/purchase-orders', { params: { limit: 200 } }),
+      api.get('/procurement/purchase-receipts', { params: { limit: 200 } }),
+      api.get('/procurement/purchase-invoices', { params: { limit: 200 } }),
+      api.get('/inventory/warehouses'),
+    ]);
+    if (common[0].status === 'fulfilled') setSuppliers(common[0].value.data?.data?.items || []);
+    if (common[1].status === 'fulfilled') setProducts(common[1].value.data?.data?.items || []);
+    if (common[2].status === 'fulfilled') setOrders(common[2].value.data?.data?.items || []);
+    if (common[3].status === 'fulfilled') setReceipts(common[3].value.data?.data?.items || []);
+    if (common[4].status === 'fulfilled') setInvoices(common[4].value.data?.data?.items || []);
+    if (common[5].status === 'fulfilled') setWarehouses(common[5].value.data?.data || []);
+  }
+
+  async function loadRows() {
     setLoading(true);
     try {
-      const common = await Promise.allSettled([
-        api.get('/suppliers', { params: { limit: 200 } }),
-        api.get('/inventory/products', { params: { limit: 200 } }),
-        api.get('/procurement/purchase-orders', { params: { limit: 200 } }),
-        api.get('/procurement/purchase-receipts', { params: { limit: 200 } }),
-        api.get('/procurement/purchase-invoices', { params: { limit: 200 } }),
-        api.get('/inventory/warehouses'),
-      ]);
-      if (common[0].status === 'fulfilled') setSuppliers(common[0].value.data?.data?.items || []);
-      if (common[1].status === 'fulfilled') setProducts(common[1].value.data?.data?.items || []);
-      if (common[2].status === 'fulfilled') setOrders(common[2].value.data?.data?.items || []);
-      if (common[3].status === 'fulfilled') setReceipts(common[3].value.data?.data?.items || []);
-      if (common[4].status === 'fulfilled') setInvoices(common[4].value.data?.data?.items || []);
-      if (common[5].status === 'fulfilled') setWarehouses(common[5].value.data?.data || []);
-
       const res = await api.get(meta.endpoint, {
-        params: kind === 'settings' || kind === 'dashboard' || kind === 'tracker' ? undefined : { limit: 100 },
+        params: serverPaged ? { page, limit: PAGE_SIZE } : undefined,
       });
       if (kind === 'dashboard') setDashboard(res.data?.data);
       else if (kind === 'settings') setSettings(res.data?.data);
-      else setRows(Array.isArray(res.data?.data) ? res.data.data : res.data?.data?.items || []);
+      else {
+        setRows(Array.isArray(res.data?.data) ? res.data.data : res.data?.data?.items || []);
+        setTotalRows(res.data?.data?.total || 0);
+      }
     } catch (err: any) {
       showApiError(err, `Failed to load ${meta.title}`);
     } finally {
@@ -208,9 +220,17 @@ export function ProcurementPage({ kind }: { kind: ProcurementKind }) {
     }
   }
 
+  async function load() {
+    await Promise.all([loadCommon(), loadRows()]);
+  }
+
   useEffect(() => {
-    load();
+    loadCommon();
   }, [kind]);
+
+  useEffect(() => {
+    loadRows();
+  }, [kind, page]);
 
   const total = useMemo(
     () =>
@@ -392,6 +412,7 @@ export function ProcurementPage({ kind }: { kind: ProcurementKind }) {
         columns={columnsFor(kind, status, operate, rfqOperation)}
         emptyMessage={`No ${meta.title.toLowerCase()} yet`}
       />
+      {totalRows > PAGE_SIZE && <Pagination page={page} totalPages={Math.ceil(totalRows / PAGE_SIZE)} total={totalRows} limit={PAGE_SIZE} onPageChange={setPage} />}
       <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setEditRow(null); setForm(defaultForm(kind)); setLines([blankLine]); } }}>
         <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
@@ -640,6 +661,8 @@ function Tracker({ rows, loading }: any) {
   }, [rows, filterSupplier, filterStatus]);
 
   // Build flat pending items for export
+  const pagination = useClientPagination<any>(filtered);
+
   const pendingItems = useMemo(() => {
     const items: any[] = [];
     for (const row of filtered) {
@@ -746,7 +769,7 @@ function Tracker({ rows, loading }: any) {
           <tbody>
             {loading && <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">Loading...</td></tr>}
             {!loading && !filtered.length && <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">No purchase orders found</td></tr>}
-            {filtered.map((row: any) => {
+            {pagination.pageRows.map((row: any) => {
               const pendingCount = (row.items || []).filter((i: any) => i.pending > 0).length;
               const isExpanded = expandedRows[row.id];
               return (
@@ -796,6 +819,7 @@ function Tracker({ rows, loading }: any) {
           </tbody>
         </table>
       </div>
+      {pagination.total > pagination.limit && <Pagination page={pagination.page} totalPages={pagination.totalPages} total={pagination.total} limit={pagination.limit} onPageChange={pagination.setPage} />}
     </div>
   );
 }

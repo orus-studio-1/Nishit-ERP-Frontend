@@ -17,24 +17,18 @@ import api from '@/lib/api';
 import { Project } from '@/types';
 import { formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { Pagination } from '@/components/shared/Pagination';
+import { usePaginatedList } from '@/hooks/usePaginatedList';
 
 export default function ProjectsPage() {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const projectList = usePaginatedList<Project>('/projects', {}, [], { errorMessage: 'Failed to load projects' });
+  const projects = projectList.items;
+  const isLoading = projectList.isLoading;
   const [showModal, setShowModal] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [form, setForm] = useState({ name: '', description: '', status: 'PLANNING', priority: 'MEDIUM', startDate: '', endDate: '', budget: '' });
 
-  const fetchProjects = async () => {
-    setIsLoading(true);
-    try {
-      const res = await api.get('/projects', { params: { limit: 50 } });
-      setProjects(res.data.data.items);
-    } catch { toast.error('Failed to load projects'); }
-    finally { setIsLoading(false); }
-  };
-
-  useEffect(() => { fetchProjects(); }, []);
+  const fetchProjects = projectList.refresh;
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,7 +61,8 @@ export default function ProjectsPage() {
       {projects.length === 0 ? (
         <EmptyState icon={FolderOpen} title="No projects yet" description="Create your first project to collaborate with your team" action={{ label: 'New Project', onClick: openCreate }} />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {projects.map(p => (
             <Card key={p.id} className="hover:shadow-md transition-shadow cursor-pointer">
               <CardContent className="p-5">
@@ -109,7 +104,9 @@ export default function ProjectsPage() {
               </CardContent>
             </Card>
           ))}
-        </div>
+          </div>
+          {projectList.total > projectList.limit && <Pagination page={projectList.page} totalPages={projectList.totalPages} total={projectList.total} limit={projectList.limit} onPageChange={projectList.setPage} />}
+        </>
       )}
 
       <Dialog open={showModal} onOpenChange={(open) => { setShowModal(open); if (!open) setEditingProject(null); }}>

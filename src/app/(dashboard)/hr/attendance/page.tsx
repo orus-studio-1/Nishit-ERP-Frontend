@@ -17,12 +17,15 @@ import api from '@/lib/api';
 import { Attendance, Employee } from '@/types';
 import { formatDate } from '@/lib/utils';
 import { showApiError, showApiSuccess } from '@/lib/apiError';
+import { Pagination } from '@/components/shared/Pagination';
+import { usePaginatedList } from '@/hooks/usePaginatedList';
 import toast from 'react-hot-toast';
 
 const statuses = ['PRESENT', 'ABSENT', 'LATE', 'HALF_DAY', 'ON_LEAVE', 'HOLIDAY'];
 
 export default function AttendancePage() {
-  const [records, setRecords] = useState<Attendance[]>([]);
+  const attendanceList = usePaginatedList<Attendance>('/hr/attendance', {}, [], { errorMessage: 'Failed to load attendance records' });
+  const records = attendanceList.items;
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -38,11 +41,7 @@ export default function AttendancePage() {
   const fetchAll = async () => {
     setIsLoading(true);
     try {
-      const [attRes, empRes] = await Promise.all([
-        api.get('/hr/attendance'),
-        api.get('/hr/employees', { params: { limit: 200 } }),
-      ]);
-      setRecords(attRes.data?.data?.items || attRes.data?.data || []);
+      const empRes = await api.get('/hr/employees', { params: { limit: 200 } });
       setEmployees(empRes.data?.data?.items || []);
     } catch (err: any) {
       showApiError(err, 'Failed to load attendance records');
@@ -81,6 +80,7 @@ export default function AttendancePage() {
         checkOut: '',
       });
       fetchAll();
+      attendanceList.reload();
     } catch (err: any) {
       showApiError(err, 'Failed to record attendance');
     } finally {
@@ -122,7 +122,7 @@ export default function AttendancePage() {
         description="Track employee daily check-ins, leaves, and attendance logs"
         action={{ label: 'Mark Attendance', onClick: () => setShowModal(true), icon: Clock }}
       />
-      {records.length === 0 && !isLoading ? (
+      {records.length === 0 && !attendanceList.isLoading ? (
         <EmptyState
           icon={Clock}
           title="No attendance records yet"
@@ -130,7 +130,10 @@ export default function AttendancePage() {
           action={{ label: 'Mark Attendance', onClick: () => setShowModal(true) }}
         />
       ) : (
-        <DataTable columns={columns} data={records} isLoading={isLoading} />
+        <>
+          <DataTable columns={columns} data={records} isLoading={attendanceList.isLoading} />
+          {attendanceList.total > attendanceList.limit && <Pagination page={attendanceList.page} totalPages={attendanceList.totalPages} total={attendanceList.total} limit={attendanceList.limit} onPageChange={attendanceList.setPage} />}
+        </>
       )}
       <Dialog open={showModal} onOpenChange={setShowModal}>
         <DialogContent className="max-w-lg">

@@ -13,11 +13,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { CrmOrganization } from '@/types';
 import { showApiError, showApiSuccess } from '@/lib/apiError';
+import { Pagination } from '@/components/shared/Pagination';
+import { usePaginatedList } from '@/hooks/usePaginatedList';
 import toast from 'react-hot-toast';
 
 export default function OrganizationsPage() {
-  const [organizations, setOrganizations] = useState<CrmOrganization[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const orgList = usePaginatedList<CrmOrganization>('/crm/organizations', {}, [], { errorMessage: 'Failed to load organizations' });
+  const organizations = orgList.items;
+  const isLoading = orgList.isLoading;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
@@ -30,22 +33,6 @@ export default function OrganizationsPage() {
     country: '',
   });
   const router = useRouter();
-
-  const load = async () => {
-    setIsLoading(true);
-    try {
-      const res = await api.get('/crm/organizations', { params: { limit: 100 } });
-      setOrganizations(res.data?.data?.items || []);
-    } catch (err: any) {
-      showApiError(err, 'Failed to load organizations');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    load();
-  }, []);
 
   const create = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -66,7 +53,7 @@ export default function OrganizationsPage() {
       showApiSuccess(`Organization "${trimmedName}" created successfully`);
       setOpen(false);
       setForm({ name: '', industry: '', website: '', email: '', phone: '', city: '', country: '' });
-      load();
+      orgList.reload();
     } catch (err: any) {
       showApiError(err, 'Failed to create organization');
     } finally {
@@ -82,6 +69,7 @@ export default function OrganizationsPage() {
         action={{ label: 'New Organization', onClick: () => setOpen(true), icon: Plus }}
       />
       {organizations.length || isLoading ? (
+      <>
         <DataTable
           data={organizations}
           isLoading={isLoading}
@@ -109,6 +97,8 @@ export default function OrganizationsPage() {
             },
           ]}
         />
+        {orgList.total > orgList.limit && <Pagination page={orgList.page} totalPages={orgList.totalPages} total={orgList.total} limit={orgList.limit} onPageChange={orgList.setPage} />}
+      </>
       ) : (
         <EmptyState
           icon={Building2}

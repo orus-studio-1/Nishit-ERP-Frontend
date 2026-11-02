@@ -18,6 +18,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { formatDate } from '@/lib/utils';
 import { showApiError, showApiSuccess } from '@/lib/apiError';
 import toast from 'react-hot-toast';
+import { Pagination } from '@/components/shared/Pagination';
+import { usePaginatedList } from '@/hooks/usePaginatedList';
 
 const purposes = [
   'MATERIAL_RECEIPT',
@@ -31,7 +33,7 @@ const purposes = [
 const emptyStockRow = () => ({ productId: '', warehouseId: '', quantity: 1, valuationRate: 0, batchId: '', batchNo: '', expiryDate: '', serialNoId: '', serialNo: '' });
 
 export default function StockEntriesPage() {
-  const [entries, setEntries] = useState<StockEntry[]>([]);
+  const entryList = usePaginatedList<StockEntry>('/inventory/stock-entries', {}, [], { errorMessage: 'Failed to load stock entries' });
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [batches, setBatches] = useState<any[]>([]);
@@ -57,14 +59,12 @@ export default function StockEntriesPage() {
   const load = async () => {
     setIsLoading(true);
     try {
-      const [entryRes, productRes, warehouseRes, batchRes, serialRes] = await Promise.all([
-        api.get('/inventory/stock-entries'),
+      const [productRes, warehouseRes, batchRes, serialRes] = await Promise.all([
         api.get('/inventory/products', { params: { limit: 300, type: 'PRODUCT' } }),
         api.get('/inventory/warehouses'),
         api.get('/inventory/batches'),
         api.get('/inventory/serial-numbers'),
       ]);
-      setEntries(entryRes.data?.data?.items || []);
       setProducts(productRes.data?.data?.items || []);
       setWarehouses(warehouseRes.data?.data || []);
       setBatches(batchRes.data?.data || []);
@@ -75,6 +75,8 @@ export default function StockEntriesPage() {
       setIsLoading(false);
     }
   };
+
+  const refresh = () => { load(); entryList.refresh(); };
 
   useEffect(() => {
     load();
@@ -94,7 +96,7 @@ export default function StockEntriesPage() {
       showApiSuccess('Stock entry created successfully');
       setOpen(false);
       setRows([emptyStockRow()]);
-      load();
+      refresh();
     } catch (err: any) {
       showApiError(err, 'Could not create stock entry');
     } finally {
@@ -106,7 +108,7 @@ export default function StockEntriesPage() {
     try {
       await api.patch(`/inventory/stock-entries/${entry.id}/status`, { status });
       showApiSuccess(`Stock entry marked ${status.toLowerCase()}`);
-      load();
+      refresh();
     } catch (err: any) {
       showApiError(err, 'Status update failed');
     }
@@ -120,8 +122,8 @@ export default function StockEntriesPage() {
         action={{ label: 'New Stock Entry', onClick: openCreate, icon: Plus }}
       />
       <DataTable
-        data={entries}
-        isLoading={isLoading}
+        data={entryList.items}
+        isLoading={entryList.isLoading}
         columns={[
           {
             key: 'entryNo',
@@ -183,6 +185,7 @@ export default function StockEntriesPage() {
           },
         ]}
       />
+      {entryList.total > entryList.limit && <Pagination page={entryList.page} totalPages={entryList.totalPages} total={entryList.total} limit={entryList.limit} onPageChange={entryList.setPage} />}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">

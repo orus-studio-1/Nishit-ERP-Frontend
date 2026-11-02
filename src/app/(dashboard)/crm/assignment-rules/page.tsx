@@ -58,7 +58,7 @@ export default function AssignmentRulesPage() {
     setIsLoading(true);
     try {
       const [ruleRes, userRes] = await Promise.all([
-        api.get('/crm/assignment-rules'),
+        api.get('/crm/assignment-rules', { params: { limit: 200 } }),
         api.get('/access/users'),
       ]);
       setRules(ruleRes.data?.data?.items || []);

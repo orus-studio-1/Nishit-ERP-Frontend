@@ -16,10 +16,12 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatCurrency } from '@/lib/utils';
 import { showApiError, showApiSuccess } from '@/lib/apiError';
+import { Pagination } from '@/components/shared/Pagination';
+import { usePaginatedList } from '@/hooks/usePaginatedList';
 
 export default function InventoryPricingPage() {
   const [priceLists, setPriceLists] = useState<PriceList[]>([]);
-  const [itemPrices, setItemPrices] = useState<ItemPrice[]>([]);
+  const priceList = usePaginatedList<ItemPrice>('/inventory/item-prices', {}, [], { errorMessage: 'Failed to load item prices' });
   const [rules, setRules] = useState<PricingRule[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -42,14 +44,12 @@ export default function InventoryPricingPage() {
   const load = async () => {
     setIsLoading(true);
     try {
-      const [pl, ip, rulesRes, prod] = await Promise.all([
+      const [pl, rulesRes, prod] = await Promise.all([
         api.get('/inventory/price-lists'),
-        api.get('/inventory/item-prices'),
         api.get('/inventory/pricing-rules'),
         api.get('/inventory/products', { params: { limit: 300 } }),
       ]);
       setPriceLists(pl.data?.data || []);
-      setItemPrices(ip.data?.data?.items || []);
       setRules(rulesRes.data?.data || []);
       setProducts(prod.data?.data?.items || []);
     } catch (err: any) {
@@ -58,6 +58,8 @@ export default function InventoryPricingPage() {
       setIsLoading(false);
     }
   };
+
+  const refresh = () => { load(); priceList.refresh(); };
 
   useEffect(() => {
     load();
@@ -76,7 +78,7 @@ export default function InventoryPricingPage() {
       await api.post('/inventory/price-lists', { ...priceListForm, name: trimmedName });
       showApiSuccess(`Price list "${trimmedName}" created`);
       setPriceListForm({ name: '', currency: 'INR' });
-      load();
+      refresh();
     } catch (err: any) {
       showApiError(err, 'Failed to create price list');
     } finally {
@@ -104,7 +106,7 @@ export default function InventoryPricingPage() {
       await api.post('/inventory/item-prices', { ...itemPriceForm, price: Number(itemPriceForm.price) });
       showApiSuccess('Item price configured successfully');
       setItemPriceForm({ productId: '', priceListId: '', currency: 'INR', price: '' });
-      load();
+      refresh();
     } catch (err: any) {
       showApiError(err, 'Failed to save item price');
     } finally {
@@ -142,7 +144,7 @@ export default function InventoryPricingPage() {
         marginPercent: '',
         priority: '100',
       });
-      load();
+      refresh();
     } catch (err: any) {
       showApiError(err, 'Failed to create pricing rule');
     } finally {
@@ -284,7 +286,7 @@ export default function InventoryPricingPage() {
       </div>
 
       <DataTable
-        data={itemPrices}
+        data={priceList.items}
         isLoading={isLoading}
         columns={[
           {
@@ -306,6 +308,7 @@ export default function InventoryPricingPage() {
           },
         ]}
       />
+      {priceList.total > priceList.limit && <Pagination page={priceList.page} totalPages={priceList.totalPages} total={priceList.total} limit={priceList.limit} onPageChange={priceList.setPage} />}
 
       <DataTable
         data={rules}

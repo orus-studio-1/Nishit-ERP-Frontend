@@ -1,25 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import api from '@/lib/api';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
 import { StockLedgerEntry } from '@/types';
 import { formatCurrency, formatDate } from '@/lib/utils';
-import { showApiError } from '@/lib/apiError';
+import { Pagination } from '@/components/shared/Pagination';
+import { usePaginatedList } from '@/hooks/usePaginatedList';
 
 export default function StockLedgerReportPage() {
-  const [rows, setRows] = useState<StockLedgerEntry[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    setIsLoading(true);
-    api
-      .get('/inventory/reports/stock-ledger')
-      .then((res) => setRows(res.data?.data || []))
-      .catch((err) => showApiError(err, 'Failed to load stock ledger report'))
-      .finally(() => setIsLoading(false));
-  }, []);
+  const list = usePaginatedList<StockLedgerEntry>('/inventory/reports/stock-ledger', {}, [], { errorMessage: 'Failed to load stock ledger report' });
 
   return (
     <div className="space-y-4">
@@ -28,8 +17,8 @@ export default function StockLedgerReportPage() {
         description="Immutable stock movement, quantity after transaction, valuation, and voucher reference"
       />
       <DataTable
-        data={rows}
-        isLoading={isLoading}
+        data={list.items}
+        isLoading={list.isLoading}
         columns={[
           {
             key: 'postingDate',
@@ -91,6 +80,7 @@ export default function StockLedgerReportPage() {
           },
         ]}
       />
+      {list.total > list.limit && <Pagination page={list.page} totalPages={list.totalPages} total={list.total} limit={list.limit} onPageChange={list.setPage} />}
     </div>
   );
 }

@@ -5,6 +5,8 @@ import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { showApiError } from '@/lib/apiError';
+import { Pagination } from '@/components/shared/Pagination';
+import { useClientPagination } from '@/hooks/useClientPagination';
 
 const reports = [
   ['Vendor rating', 'vendor-rating'], ['Purchase analysis', 'purchase-analysis'], ['Item/vendor price trend', 'price-trend'],
@@ -17,6 +19,7 @@ export function ProcurementReportsPage() {
   const [type, setType] = useState('vendor-rating');
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const pagination = useClientPagination(rows);
   async function load(selected = type) {
     setLoading(true);
     try { const response = await api.get(`/procurement/reports/${selected}`); setRows(Array.isArray(response.data?.data) ? response.data.data : []); }
@@ -28,8 +31,9 @@ export function ProcurementReportsPage() {
     <PageHeader title="Procurement Reports" description="Sourcing, GRN, matching, statutory, vendor-performance and spend controls" />
     <div className="flex flex-wrap gap-2">{reports.map(([label, key]) => <Button key={key} variant={type === key ? 'default' : 'outline'} size="sm" onClick={() => setType(key)}>{label}</Button>)}</div>
     <div className="overflow-auto rounded-md border bg-white">
-      {loading ? <p className="p-6 text-sm text-gray-500">Loading report…</p> : !rows.length ? <p className="p-6 text-sm text-gray-500">No records for this report.</p> : <table className="w-full text-left text-sm"><thead className="border-b bg-gray-50"><tr>{Object.keys(rows[0]).slice(0, 8).map(key => <th key={key} className="p-3 font-medium capitalize">{key.replace(/([A-Z])/g, ' $1')}</th>)}</tr></thead><tbody>{rows.map((row, index) => <tr key={row.id || index} className="border-b hover:bg-gray-50"><>{Object.keys(rows[0]).slice(0, 8).map(key => <td key={key} className="max-w-64 p-3">{displayValue(row[key])}</td>)}</></tr>)}</tbody></table>}
+      {loading ? <p className="p-6 text-sm text-gray-500">Loading report…</p> : !rows.length ? <p className="p-6 text-sm text-gray-500">No records for this report.</p> : <table className="w-full text-left text-sm"><thead className="border-b bg-gray-50"><tr>{Object.keys(rows[0]).slice(0, 8).map(key => <th key={key} className="p-3 font-medium capitalize">{key.replace(/([A-Z])/g, ' $1')}</th>)}</tr></thead><tbody>{pagination.pageRows.map((row, index) => <tr key={row.id || index} className="border-b hover:bg-gray-50"><>{Object.keys(rows[0]).slice(0, 8).map(key => <td key={key} className="max-w-64 p-3">{displayValue(row[key])}</td>)}</></tr>)}</tbody></table>}
     </div>
+    {pagination.total > pagination.limit && <Pagination page={pagination.page} totalPages={pagination.totalPages} total={pagination.total} limit={pagination.limit} onPageChange={pagination.setPage} />}
   </div>;
 }
 

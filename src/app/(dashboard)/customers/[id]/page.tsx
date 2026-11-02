@@ -15,6 +15,8 @@ import api from '@/lib/api';
 import { Customer, SalesInvoice } from '@/types';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { showApiError } from '@/lib/apiError';
+import { Pagination } from '@/components/shared/Pagination';
+import { usePaginatedList } from '@/hooks/usePaginatedList';
 
 interface OutstandingSummary {
   customerId: string;
@@ -39,10 +41,9 @@ function invoiceOutstanding(invoice: SalesInvoice) {
 export default function CustomerDetailPage() {
   const params = useParams<{ id: string }>();
   const [customer, setCustomer] = useState<Customer | null>(null);
-  const [invoices, setInvoices] = useState<SalesInvoice[]>([]);
+  const invoiceList = usePaginatedList<SalesInvoice>(`/customers/${params.id}/invoices`, {}, [], { errorMessage: 'Failed to load customer invoice history' });
   const [summary, setSummary] = useState<OutstandingSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [invoiceLoading, setInvoiceLoading] = useState(true);
 
   useEffect(() => {
     api.get(`/customers/${params.id}`)
@@ -52,17 +53,9 @@ export default function CustomerDetailPage() {
   }, [params.id]);
 
   useEffect(() => {
-    Promise.all([
-      api.get(`/customers/${params.id}/invoices`),
-      api.get(`/customers/${params.id}/outstanding`),
-    ])
-      .then(([invoiceRes, outstandingRes]) => {
-        const invoicePayload = invoiceRes.data?.data;
-        setInvoices(invoicePayload?.items || invoicePayload || []);
-        setSummary(outstandingRes.data?.data || outstandingRes.data);
-      })
-      .catch(err => showApiError(err, 'Failed to load customer invoice history and balances'))
-      .finally(() => setInvoiceLoading(false));
+    api.get(`/customers/${params.id}/outstanding`)
+      .then(outstandingRes => setSummary(outstandingRes.data?.data || outstandingRes.data))
+      .catch(err => showApiError(err, 'Failed to load customer balances'));
   }, [params.id]);
 
   if (isLoading || !customer) {
@@ -112,8 +105,8 @@ export default function CustomerDetailPage() {
             <CardHeader><CardTitle>Invoice History</CardTitle></CardHeader>
             <CardContent>
               <DataTable
-                isLoading={invoiceLoading}
-                data={invoices}
+                isLoading={invoiceList.isLoading}
+                data={invoiceList.items}
                 columns={[
                   { key: 'invoiceNo', header: 'Invoice #', render: (invoice: SalesInvoice) => <Link href={`/invoicing/sales-invoices/${invoice.id}`} className="font-mono text-sm font-semibold text-[#1674c4] hover:underline">{invoice.invoiceNo}</Link> },
                   { key: 'date', header: 'Date', render: (invoice: SalesInvoice) => formatDate(invoice.date) },
@@ -125,6 +118,7 @@ export default function CustomerDetailPage() {
                 ]}
                 onRowClick={invoice => { window.location.href = `/invoicing/sales-invoices/${invoice.id}`; }}
               />
+              {invoiceList.total > invoiceList.limit && <Pagination page={invoiceList.page} totalPages={invoiceList.totalPages} total={invoiceList.total} limit={invoiceList.limit} onPageChange={invoiceList.setPage} />}
             </CardContent>
           </Card>
         </TabsContent>

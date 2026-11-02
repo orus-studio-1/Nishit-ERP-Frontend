@@ -152,7 +152,7 @@ export default function ProductsPage() {
   };
 
   const getTotalStock = (product: Product) =>
-    product.stockLevels?.reduce((sum, sl) => sum + sl.quantity, 0) || 0;
+    product.stockLevels?.reduce((sum, sl) => sum + Number(sl.quantity), 0) || 0;
 
   const openCreate = () => { setEditingProduct(null); setForm({ sku: '', name: '', description: '', categoryId: '', unitId: '', type: 'PRODUCT', supplyPolicy: 'STOCK', costPrice: 0, salePrice: 0, taxRate: 0, minStockLevel: 0, valuationMethod: 'MOVING_AVERAGE', maintainStock: true, allowNegativeStock: false, hasBatchNo: false, hasSerialNo: false, reorderLevel: 0, reorderQty: 0, brand: '', manufacturer: '' }); setShowModal(true); };
   const openEdit = (product: Product) => {
