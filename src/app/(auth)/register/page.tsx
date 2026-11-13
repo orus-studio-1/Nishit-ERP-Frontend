@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { PASSWORD_HINT, PASSWORD_MIN_LENGTH, passwordError } from '@/lib/passwordPolicy';
 
 export default function RegisterPage() {
   const [form, setForm] = useState({ firstName: '', lastName: '', email: '', password: '', phone: '' });
@@ -24,6 +25,8 @@ export default function RegisterPage() {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    const invalid = passwordError(form.password);
+    if (invalid) { toast.error(invalid); return; }
     setIsSubmitting(true);
     try {
       await register({ ...form, email: form.email.trim().toLowerCase() });
@@ -51,7 +54,7 @@ export default function RegisterPage() {
               <div className="grid grid-cols-2 gap-3"><div className="space-y-1.5"><Label htmlFor="firstName">First name</Label><Input id="firstName" autoComplete="given-name" value={form.firstName} onChange={(event) => update('firstName', event.target.value)} required /></div><div className="space-y-1.5"><Label htmlFor="lastName">Last name</Label><Input id="lastName" autoComplete="family-name" value={form.lastName} onChange={(event) => update('lastName', event.target.value)} required /></div></div>
               <div className="space-y-1.5"><Label htmlFor="email">Email</Label><Input id="email" type="email" autoComplete="email" value={form.email} onChange={(event) => update('email', event.target.value)} required /></div>
               <div className="space-y-1.5"><Label htmlFor="phone">Phone <span className="text-[#9ca3af]">(optional)</span></Label><Input id="phone" type="tel" autoComplete="tel" value={form.phone} onChange={(event) => update('phone', event.target.value)} /></div>
-              <div className="space-y-1.5"><Label htmlFor="password">Password</Label><Input id="password" type="password" autoComplete="new-password" value={form.password} onChange={(event) => update('password', event.target.value)} minLength={12} required /><p className="text-xs text-[#6b7280]">At least 12 characters with uppercase, lowercase, number, and symbol.</p></div>
+              <div className="space-y-1.5"><Label htmlFor="password">Password</Label><Input id="password" type="password" autoComplete="new-password" value={form.password} onChange={(event) => update('password', event.target.value)} minLength={PASSWORD_MIN_LENGTH} required /><p className="text-xs text-[#6b7280]">{PASSWORD_HINT}</p></div>
               <Button type="submit" className="h-10 w-full bg-[#2490ef] font-semibold hover:bg-[#1674c4]" disabled={isSubmitting || isLoading}>{isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating account...</> : 'Create account'}</Button>
             </form>
             <p className="mt-5 text-center text-sm text-[#6b7280]">Already have an account? <Link href="/login" className="font-medium text-[#1674c4] hover:underline">Sign in</Link></p>

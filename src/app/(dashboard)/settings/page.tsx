@@ -9,6 +9,7 @@ import { useState } from 'react';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 import { getInitials } from '@/lib/utils';
+import { PASSWORD_HINT, PASSWORD_MIN_LENGTH, passwordError } from '@/lib/passwordPolicy';
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -29,6 +30,11 @@ export default function SettingsPage() {
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
+    const invalid = passwordError(passwords.newPassword);
+    if (invalid) {
+      toast.error(invalid);
+      return;
+    }
     if (passwords.newPassword !== passwords.confirmPassword) {
       toast.error('Passwords do not match');
       return;
@@ -78,7 +84,7 @@ export default function SettingsPage() {
         <CardContent>
           <form onSubmit={handlePasswordChange} className="space-y-4">
             <div className="space-y-1.5"><Label>Current Password</Label><Input type="password" value={passwords.currentPassword} onChange={e => setPasswords(p => ({ ...p, currentPassword: e.target.value }))} required /></div>
-            <div className="space-y-1.5"><Label>New Password</Label><Input type="password" value={passwords.newPassword} onChange={e => setPasswords(p => ({ ...p, newPassword: e.target.value }))} required /></div>
+            <div className="space-y-1.5"><Label>New Password</Label><Input type="password" autoComplete="new-password" minLength={PASSWORD_MIN_LENGTH} value={passwords.newPassword} onChange={e => setPasswords(p => ({ ...p, newPassword: e.target.value }))} required /><p className="text-xs text-gray-500">{PASSWORD_HINT}</p></div>
             <div className="space-y-1.5"><Label>Confirm New Password</Label><Input type="password" value={passwords.confirmPassword} onChange={e => setPasswords(p => ({ ...p, confirmPassword: e.target.value }))} required /></div>
             <Button type="submit" disabled={isSavingPwd}>{isSavingPwd ? 'Changing...' : 'Change Password'}</Button>
           </form>

@@ -24,6 +24,18 @@ export default function LoginPage() {
     if (!isLoading && user && token) router.replace('/dashboard');
   }, [isLoading, router, token, user]);
 
+  // Explain why the user landed here when an administrator signed them out
+  // (role change, password reset or deactivation).
+  useEffect(() => {
+    try {
+      const reason = sessionStorage.getItem('signedOutReason');
+      if (reason) {
+        sessionStorage.removeItem('signedOutReason');
+        toast(reason, { id: 'signed-out-reason', icon: 'ℹ️', duration: 8000 });
+      }
+    } catch {}
+  }, []);
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setIsSubmitting(true);

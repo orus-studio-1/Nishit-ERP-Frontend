@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import toast from 'react-hot-toast';
-import { UserRoundCog } from 'lucide-react';
+import { Lock, UserRoundCog } from 'lucide-react';
 import api from '@/lib/api';
 import { DataTable } from '@/components/shared/DataTable';
 import { Button } from '@/components/ui/button';
@@ -10,10 +10,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PermissionMatrix } from './PermissionMatrix';
+import { OverrideDetailsTable } from './OverrideDetailsTable';
+import { PASSWORD_HINT, PASSWORD_MIN_LENGTH, passwordError } from '@/lib/passwordPolicy';
+import type { OverrideMeta } from './overrideExpiry';
 
 function nameOf(user: any) {
   return `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.email || '-';
 }
+
+const ownOverrideMessage = 'You cannot change your own permission overrides. Please ask another Super Admin to make this change.';
 
 function toggleSet(set: Set<string>, id: string) {
   const next = new Set(set);
@@ -24,17 +29,27 @@ function toggleSet(set: Set<string>, id: string) {
 export function EmployeeAccessTab({
   loading, users, userColumns, selectedUser, setSelectedUserId, userIsActive, setUserIsActive,
   roles, userRoleIds, setUserRoleIds, saveUserAccess, permissions, userAllowed, userDenied, setUserAllowed, setUserDenied,
-  onPasswordIssued,
+  onPasswordIssued, isSuperAdmin, targetIsSuperAdmin, isOwnAccount,
+  userOverrideMeta, setUserOverrideMeta, expiredOverrides,
 }: any) {
+  const toggleLoginActive = (checked: boolean) => {
+    if (isOwnAccount && !checked) {
+      toast.error('You cannot deactivate your own account. To keep the system accessible, another Super Admin must do this.');
+      return;
+    }
+    setUserIsActive(checked);
+  };
+  const lockedTarget = !isSuperAdmin && targetIsSuperAdmin;
   const [passwords, setPasswords] = useState({ password: '', confirmPassword: '' });
 
   const issuePassword = async () => {
     if (!selectedUser) return toast.error('Select an employee user first');
-    if (passwords.password.length < 8) return toast.error('Password must be at least 8 characters');
+    const invalid = passwordError(passwords.password);
+    if (invalid) return toast.error(invalid);
     if (passwords.password !== passwords.confirmPassword) return toast.error('Password confirmation does not match');
     try {
       await api.put(`/access/users/${selectedUser.id}/password`, { ...passwords, activate: true });
-      toast.success('Password issued and login activated');
+      toast.success('Password issued and login activated. The user has been signed out of all devices and must sign in with the new password.');
       setPasswords({ password: '', confirmPassword: '' });
       setUserIsActive(true);
       onPasswordIssued?.();
@@ -68,9 +83,15 @@ export function EmployeeAccessTab({
                   <p className="mt-1 text-[#6b7280]">{selectedUser.employee?.department?.name || 'No department'} / {selectedUser.employee?.position?.title || 'No position'}</p>
                 </div>
                 <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" checked={userIsActive} onChange={(event) => setUserIsActive(event.target.checked)} />
+                  <input type="checkbox" checked={userIsActive} onChange={(event) => toggleLoginActive(event.target.checked)} />
                   Login active
                 </label>
+                {isOwnAccount && (
+                  <div className="flex items-start gap-2 rounded-md border border-[#cfe3f5] bg-[#f2f8fd] p-3 text-sm text-[#1f4e79]">
+                    <Lock className="mt-0.5 h-4 w-4 shrink-0" />
+                    This is your own account. You cannot deactivate it or change your own roles and overrides. Another Super Admin must make these changes.
+                  </div>
+                )}
                 <div className="rounded-md border border-[#e5e2dc] bg-white p-3">
                   <div className="mb-3">
                     <p className="text-sm font-semibold text-[#1f2937]">Issue Login Password</p>
@@ -79,7 +100,8 @@ export function EmployeeAccessTab({
                   <div className="space-y-2">
                     <div className="space-y-1.5">
                       <Label>New Password</Label>
-                      <Input type="password" value={passwords.password} onChange={(event) => setPasswords((prev) => ({ ...prev, password: event.target.value }))} placeholder="Minimum 8 characters" />
+                      <Input type="password" value={passwords.password} onChange={(event) => setPasswords((prev) => ({ ...prev, password: event.target.value }))} minLength={PASSWORD_MIN_LENGTH} autoComplete="new-password" />
+                      <p className="text-xs text-[#6b7280]">{PASSWORD_HINT}</p>
                     </div>
                     <div className="space-y-1.5">
                       <Label>Confirm Password</Label>
@@ -88,22 +110,45 @@ export function EmployeeAccessTab({
                     <Button variant="outline" onClick={issuePassword}>Issue Password</Button>
                   </div>
                 </div>
+                {lockedTarget && (
+                  <div className="flex items-start gap-2 rounded-md border border-[#f3d9a4] bg-[#fff8e8] p-3 text-sm text-[#7a4b00]">
+                    <Lock className="mt-0.5 h-4 w-4 shrink-0" />
+                    This user is a Super Admin. Only a Super Admin can change their roles, overrides or login status.
+                  </div>
+                )}
                 <div className="space-y-1.5">
                   <Label>Assigned Roles</Label>
                   <div className="max-h-48 space-y-1 overflow-auto rounded-md border border-[#e5e2dc] p-2">
-                    {roles.map((role: any) => (
-                      <label key={role.id} className="flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={userRoleIds.has(role.id)}
-                          onChange={() => setUserRoleIds((set: Set<string>) => toggleSet(set, role.id))}
-                        />
-                        {role.title || role.name}
-                      </label>
-                    ))}
+                    {roles.map((role: any) => {
+                      const restricted = !isSuperAdmin && (lockedTarget || role.isSuperAdmin);
+                      return (
+                        <label
+                          key={role.id}
+                          className={`flex items-center gap-2 text-sm ${restricted ? 'cursor-not-allowed text-[#9ca3af]' : ''}`}
+                          title={restricted && role.isSuperAdmin ? 'Only a Super Admin can assign this role' : undefined}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={userRoleIds.has(role.id)}
+                            disabled={restricted}
+                            onChange={() => {
+                              if (isOwnAccount) {
+                                toast.error('You cannot change your own roles. Please ask another Super Admin to make this change.');
+                                return;
+                              }
+                              setUserRoleIds((set: Set<string>) => toggleSet(set, role.id));
+                            }}
+                          />
+                          {role.title || role.name}
+                          {role.isSuperAdmin && !isSuperAdmin && (
+                            <span className="ml-auto flex items-center gap-1 text-xs text-[#9ca3af]"><Lock className="h-3 w-3" /> Super Admin only</span>
+                          )}
+                        </label>
+                      );
+                    })}
                   </div>
                 </div>
-                <Button onClick={saveUserAccess}>Save User Access</Button>
+                <Button onClick={saveUserAccess} disabled={lockedTarget}>Save User Access</Button>
               </>
             )}
           </CardContent>
@@ -118,12 +163,25 @@ export function EmployeeAccessTab({
               <p className="text-xs text-[#6b7280]">Use this only for exceptions. Role permissions should handle normal access.</p>
             </div>
           </div>
+          <OverrideDetailsTable
+            permissions={permissions}
+            allowed={userAllowed}
+            denied={userDenied}
+            meta={userOverrideMeta}
+            expired={expiredOverrides}
+            readOnly={isOwnAccount || lockedTarget}
+            onMetaChange={(id, patch) => setUserOverrideMeta((m: Record<string, OverrideMeta>) => ({ ...m, [id]: { expiresAt: m[id]?.expiresAt ?? null, reason: m[id]?.reason ?? '', ...patch } }))}
+            onRemove={(id) => {
+              setUserAllowed((s: Set<string>) => { const n = new Set(s); n.delete(id); return n; });
+              setUserDenied((s: Set<string>) => { const n = new Set(s); n.delete(id); return n; });
+            }}
+          />
           <PermissionMatrix
             permissions={permissions}
             allowed={userAllowed}
             denied={userDenied}
-            onAllow={(id) => { setUserDenied((s: Set<string>) => { const n = new Set(s); n.delete(id); return n; }); setUserAllowed((s: Set<string>) => toggleSet(s, id)); }}
-            onDeny={(id) => { setUserAllowed((s: Set<string>) => { const n = new Set(s); n.delete(id); return n; }); setUserDenied((s: Set<string>) => toggleSet(s, id)); }}
+            onAllow={(id) => { if (isOwnAccount) { toast.error(ownOverrideMessage); return; } setUserDenied((s: Set<string>) => { const n = new Set(s); n.delete(id); return n; }); setUserAllowed((s: Set<string>) => toggleSet(s, id)); }}
+            onDeny={(id) => { if (isOwnAccount) { toast.error(ownOverrideMessage); return; } setUserAllowed((s: Set<string>) => { const n = new Set(s); n.delete(id); return n; }); setUserDenied((s: Set<string>) => toggleSet(s, id)); }}
           />
         </div>
       )}

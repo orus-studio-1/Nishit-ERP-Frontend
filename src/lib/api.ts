@@ -6,6 +6,11 @@ const api = axios.create({
   withCredentials: true,
 });
 
+const newIdempotencyKey = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+};
+
 let accessToken: string | null = null;
 let refreshPromise: Promise<string> | null = null;
 if (typeof window !== 'undefined') {
@@ -50,6 +55,12 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  // The backend requires an Idempotency-Key on document and money POSTs (e.g. /platform/*) so a
+  // double click or network retry can't create the same record twice. One key per request; a
+  // retry of the same request (e.g. after a token refresh) reuses it because it reuses this config.
+  if (config.method?.toLowerCase() === 'post' && !config.headers['Idempotency-Key']) {
+    config.headers['Idempotency-Key'] = newIdempotencyKey();
+  }
   return config;
 });
 
@@ -68,8 +79,13 @@ api.interceptors.response.use(
           const newToken = await refreshAccessToken();
           err.config.headers.Authorization = `Bearer ${newToken}`;
           return api.request(err.config);
-        } catch {
-          // Token refresh failed
+        } catch (refreshErr) {
+          // Token refresh failed. If an administrator signed this user out (role change,
+          // password reset, deactivation), keep the server's reason to show on the login page.
+          const data = (refreshErr as { response?: { data?: { code?: string; message?: string } } })?.response?.data;
+          if (data?.code === 'SESSION_REVOKED' && data?.message && typeof window !== 'undefined') {
+            try { sessionStorage.setItem('signedOutReason', data.message); } catch {}
+          }
         }
       }
 

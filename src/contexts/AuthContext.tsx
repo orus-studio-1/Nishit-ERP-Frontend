@@ -10,7 +10,8 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string, code?: string, challenge?: string) => Promise<{ requiresTwoFactor?: boolean; challenge?: string }>;
   register: (data: RegisterData) => Promise<AuthResponse>;
-  logout: () => Promise<void>;
+  /** Signs out. `allDevices` also ends every other session (all browsers and devices). */
+  logout: (options?: { allDevices?: boolean }) => Promise<void>;
 }
 
 interface RegisterData {
@@ -144,12 +145,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return res.data.data;
   };
 
-  const logout = async () => {
+  const logout = async (options?: { allDevices?: boolean }) => {
+    // Signing out everywhere must really reach the server. If it fails for any reason other than
+    // an already-expired session, stay signed in and let the caller report it, rather than
+    // pretending other devices were signed out.
+    if (options?.allDevices) {
+      const statusOf = (err: unknown) => (err as { response?: { status?: number } })?.response?.status;
+      try {
+        await api.post('/auth/logout-all');
+      } catch (err) {
+        if (statusOf(err) !== 401) throw err;
+        // The short-lived access token expired while idle: renew it and try once more, so other
+        // devices really are signed out. If renewal fails, no session is left to end.
+        let renewed = false;
+        try { await refreshAccessToken(); renewed = true; } catch {}
+        if (renewed) {
+          try { await api.post('/auth/logout-all'); } catch (retryErr) { if (statusOf(retryErr) !== 401) throw retryErr; }
+        }
+      }
+    }
     // The refresh cookie is HttpOnly, so the server must clear it before we
     // navigate away. A fire-and-forget request can be cancelled by navigation
     // and causes the session to be restored immediately on the login page.
     try {
-      await api.post('/auth/logout');
+      if (!options?.allDevices) await api.post('/auth/logout');
     } catch {
       // Local sign-out must still complete when the session already expired or
       // the API is temporarily unavailable.
@@ -162,6 +181,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           localStorage.removeItem('token');
           localStorage.removeItem('user');
           sessionStorage.clear();
+          sessionStorage.setItem('signedOutReason', options?.allDevices ? 'You have been signed out of all devices.' : 'You have been signed out.');
         } catch {}
         window.location.replace('/login');
       }

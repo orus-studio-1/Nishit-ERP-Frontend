@@ -7,14 +7,16 @@ import { getInitials } from '@/lib/utils';
 import api from '@/lib/api';
 import type { Notification } from '@/types';
 import { useEffect, useState } from 'react';
+import { SignOutDialog } from './SignOutDialog';
 
 interface HeaderProps {
   onMenuClick: () => void;
 }
 
 export function Header({ onMenuClick }: HeaderProps) {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [signOutOpen, setSignOutOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -134,7 +136,7 @@ export function Header({ onMenuClick }: HeaderProps) {
                 <p className="truncate text-xs text-[#7c8591]">{user?.email}</p>
               </div>
               <button
-                onClick={logout}
+                onClick={() => { setUserMenuOpen(false); setSignOutOpen(true); }}
                 className="flex w-full items-center gap-2 px-3 py-2 text-sm text-[#c3423f] hover:bg-[#fff1f0]"
               >
                 <LogOut className="h-4 w-4" />
@@ -144,6 +146,7 @@ export function Header({ onMenuClick }: HeaderProps) {
           )}
         </div>
       </div>
+      <SignOutDialog open={signOutOpen} onOpenChange={setSignOutOpen} />
     </header>
   );
 }

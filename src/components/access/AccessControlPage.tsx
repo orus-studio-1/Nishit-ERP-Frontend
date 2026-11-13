@@ -5,6 +5,8 @@ import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { History, KeyRound, Plus, RefreshCcw, ShieldCheck, Users } from 'lucide-react';
 import api from '@/lib/api';
+import { showApiError } from '@/lib/apiError';
+import { useAuth } from '@/contexts/AuthContext';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
 import { StatusBadge } from '@/components/shared/StatusBadge';
@@ -17,6 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { PermissionMatrix } from './PermissionMatrix';
 import { EmployeeAccessTab } from './EmployeeAccessTab';
+import { isExpired, overrideCountLabel, type OverrideMeta, type StoredOverride } from './overrideExpiry';
 
 function nameOf(user: any) {
   return `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.email || '-';
@@ -41,11 +44,17 @@ export function AccessControlPage() {
   const [userRoleIds, setUserRoleIds] = useState<Set<string>>(new Set());
   const [userAllowed, setUserAllowed] = useState<Set<string>>(new Set());
   const [userDenied, setUserDenied] = useState<Set<string>>(new Set());
+  const [userOverrideMeta, setUserOverrideMeta] = useState<Record<string, OverrideMeta>>({});
+  const [expiredOverrides, setExpiredOverrides] = useState<StoredOverride[]>([]);
   const [userIsActive, setUserIsActive] = useState(true);
   const [loading, setLoading] = useState(true);
 
+  const { user: currentUser } = useAuth();
+  const isSuperAdmin = Boolean(currentUser?.access?.isSuperAdmin);
   const selectedRole = useMemo(() => roles.find((r) => r.id === selectedRoleId), [roles, selectedRoleId]);
   const selectedUser = useMemo(() => users.find((u) => u.id === selectedUserId), [users, selectedUserId]);
+  const isOwnAccount = Boolean(selectedUser && currentUser?.id === selectedUser.id);
+  const targetIsSuperAdmin =Boolean(selectedUser?.accessRoles?.some((r: { role?: { isSuperAdmin?: boolean } }) => r.role?.isSuperAdmin));
 
   const fetchAll = async () => {
     setLoading(true);
@@ -79,55 +88,105 @@ export function AccessControlPage() {
   useEffect(() => {
     if (!selectedUser) return;
     setUserRoleIds(new Set(selectedUser.accessRoles?.map((r: any) => r.roleId) || []));
-    setUserAllowed(new Set(selectedUser.permissionOverrides?.filter((p: any) => p.effect === 'ALLOW').map((p: any) => p.permissionId)));
-    setUserDenied(new Set(selectedUser.permissionOverrides?.filter((p: any) => p.effect === 'DENY').map((p: any) => p.permissionId)));
+    // Expired overrides no longer apply: keep them out of the grid (so saving can never revive
+    // them) and list them separately as history.
+    const overrides: StoredOverride[] = selectedUser.permissionOverrides || [];
+    const live = overrides.filter((o) => !isExpired(o.expiresAt));
+    setUserAllowed(new Set(live.filter((o) => o.effect === 'ALLOW').map((o) => o.permissionId)));
+    setUserDenied(new Set(live.filter((o) => o.effect === 'DENY').map((o) => o.permissionId)));
+    setUserOverrideMeta(Object.fromEntries(live.map((o) => [o.permissionId, { expiresAt: o.expiresAt || null, reason: o.reason || '' }])));
+    setExpiredOverrides(overrides.filter((o) => isExpired(o.expiresAt)));
     setUserIsActive(Boolean(selectedUser.isActive));
   }, [selectedUser]);
 
   const bootstrap = async () => {
-    await api.post('/access/bootstrap');
-    toast.success('Access catalog synchronized');
-    fetchAll();
+    try {
+      await api.post('/access/bootstrap');
+      toast.success('Access catalog synchronized');
+      fetchAll();
+    } catch (err) {
+      showApiError(err, 'Could not synchronize the access catalog');
+    }
   };
 
   const createRole = async () => {
     if (!roleForm.name.trim()) return toast.error('Role name is required');
-    await api.post('/access/roles', {
-      ...roleForm,
-      permissionIds: [...roleAllowed],
-      deniedPermissionIds: [...roleDenied],
-    });
-    toast.success('Role created');
-    setRoleForm({ name: '', title: '', description: '' });
-    setRoleAllowed(new Set());
-    setRoleDenied(new Set());
-    fetchAll();
+    try {
+      await api.post('/access/roles', {
+        ...roleForm,
+        permissionIds: [...roleAllowed],
+        deniedPermissionIds: [...roleDenied],
+      });
+      toast.success('Role created');
+      setRoleForm({ name: '', title: '', description: '' });
+      setRoleAllowed(new Set());
+      setRoleDenied(new Set());
+      fetchAll();
+    } catch (err) {
+      showApiError(err, 'Could not create the role');
+    }
   };
 
   const saveRole = async () => {
     if (!selectedRoleId) return toast.error('Select a role first');
-    await api.put(`/access/roles/${selectedRoleId}`, {
-      title: roleForm.title,
-      description: roleForm.description,
-      permissionIds: [...roleAllowed],
-      deniedPermissionIds: [...roleDenied],
-    });
-    toast.success('Role permissions saved');
-    fetchAll();
+    try {
+      await api.put(`/access/roles/${selectedRoleId}`, {
+        title: roleForm.title,
+        description: roleForm.description,
+        permissionIds: [...roleAllowed],
+        deniedPermissionIds: [...roleDenied],
+      });
+      toast.success('Role permissions saved');
+      fetchAll();
+    } catch (err) {
+      showApiError(err, 'Could not save the role permissions');
+    }
   };
 
   const saveUserAccess = async () => {
     if (!selectedUserId) return toast.error('Select an employee user first');
-    await api.put(`/access/users/${selectedUserId}/access`, {
-      isActive: userIsActive,
-      roleIds: [...userRoleIds],
-      permissionOverrides: [
-        ...[...userAllowed].map((permissionId) => ({ permissionId, effect: 'ALLOW' })),
-        ...[...userDenied].map((permissionId) => ({ permissionId, effect: 'DENY' })),
-      ],
-    });
-    toast.success('User access updated');
-    fetchAll();
+    if (isOwnAccount && !userIsActive) {
+      setUserIsActive(true);
+      return toast.error('You cannot deactivate your own account. To keep the system accessible, another Super Admin must do this.');
+    }
+    if (isOwnAccount) {
+      return toast.error('You cannot change your own roles or permission overrides. Please ask another Super Admin to make this change.', { id: 'own-access' });
+    }
+    if (!isSuperAdmin && targetIsSuperAdmin) {
+      return toast.error('This user is a Super Admin. Only a Super Admin can change their access.');
+    }
+    if (!isSuperAdmin && roles.some((role) => role.isSuperAdmin && userRoleIds.has(role.id))) {
+      return toast.error('Only a Super Admin can assign the Super Admin role. Please ask a Super Admin to make this change.');
+    }
+    const overrideFor = (permissionId: string, effect: 'ALLOW' | 'DENY') => {
+      const meta = userOverrideMeta[permissionId];
+      return { permissionId, effect, expiresAt: meta?.expiresAt || null, reason: meta?.reason?.trim() || null };
+    };
+    const live = [
+      ...[...userAllowed].map((permissionId) => overrideFor(permissionId, 'ALLOW')),
+      ...[...userDenied].map((permissionId) => overrideFor(permissionId, 'DENY')),
+    ];
+    if (live.some((o) => isExpired(o.expiresAt))) {
+      return toast.error('One or more overrides have an expiry date in the past. Choose a future date or "Never".');
+    }
+    // Expired overrides are sent back unchanged so they stay as history; a permission picked
+    // again in the grid replaces its expired entry.
+    const liveIds = new Set(live.map((o) => o.permissionId));
+    const history = expiredOverrides
+      .filter((o) => !liveIds.has(o.permissionId))
+      .map((o) => ({ permissionId: o.permissionId, effect: o.effect, expiresAt: o.expiresAt || null, reason: o.reason || null }));
+    try {
+      const res = await api.put(`/access/users/${selectedUserId}/access`, {
+        isActive: userIsActive,
+        roleIds: [...userRoleIds],
+        permissionOverrides: [...live, ...history],
+      });
+      if (res.data?.data?.sessionsRevoked) toast.success('User access updated. They have been signed out of all devices and must sign in again.');
+      else toast.success(res.data?.message || 'User access saved');
+      fetchAll();
+    } catch (err) {
+      showApiError(err, 'Could not update user access');
+    }
   };
 
   const roleColumns = [
@@ -141,7 +200,7 @@ export function AccessControlPage() {
     { key: 'name', header: 'Employee User', render: (u: any) => <div><p className="font-medium">{nameOf(u)}</p><p className="text-xs text-[#6b7280]">{u.email}</p></div> },
     { key: 'employee', header: 'Employee Record', render: (u: any) => u.employee ? `${u.employee.employeeId || ''} ${u.employee.position?.title ? `- ${u.employee.position.title}` : ''}` : 'No employee record' },
     { key: 'roles', header: 'Roles', render: (u: any) => <div className="flex flex-wrap gap-1">{u.accessRoles?.length ? u.accessRoles.map((r: any) => <StatusBadge key={r.roleId} status={r.role?.title || r.role?.name} />) : <span className="text-[#8a929d]">No roles</span>}</div> },
-    { key: 'overrides', header: 'Overrides', render: (u: any) => u.permissionOverrides?.length || 0 },
+    { key: 'overrides', header: 'Overrides', render: (u: any) => overrideCountLabel(u.permissionOverrides) },
     { key: 'isActive', header: 'Status', render: (u: any) => <StatusBadge status={u.isActive ? 'ACTIVE' : 'DISABLED'} /> },
   ];
 
@@ -177,6 +236,9 @@ export function AccessControlPage() {
             userIsActive={userIsActive}
             setUserIsActive={setUserIsActive}
             roles={roles}
+            isSuperAdmin={isSuperAdmin}
+            targetIsSuperAdmin={targetIsSuperAdmin}
+            isOwnAccount={isOwnAccount}
             userRoleIds={userRoleIds}
             setUserRoleIds={setUserRoleIds}
             saveUserAccess={saveUserAccess}
@@ -185,6 +247,9 @@ export function AccessControlPage() {
             userDenied={userDenied}
             setUserAllowed={setUserAllowed}
             setUserDenied={setUserDenied}
+            userOverrideMeta={userOverrideMeta}
+            setUserOverrideMeta={setUserOverrideMeta}
+            expiredOverrides={expiredOverrides}
             onPasswordIssued={fetchAll}
           />
         </TabsContent>
