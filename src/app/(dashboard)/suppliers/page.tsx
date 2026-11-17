@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Plus, Truck, Pencil } from 'lucide-react';
+import { Plus, Truck, Pencil, FileUp } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
 import { Pagination } from '@/components/shared/Pagination';
@@ -16,6 +16,8 @@ import api from '@/lib/api';
 import { Supplier } from '@/types';
 import { showApiError, showApiSuccess } from '@/lib/apiError';
 import toast from 'react-hot-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import { SupplierImportDialog } from '@/components/suppliers/SupplierImportDialog';
 
 export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -25,6 +27,9 @@ export default function SuppliersPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const { user } = useAuth();
+  const canImport = Boolean(user?.access?.isSuperAdmin || (user?.access?.permissions?.includes('suppliers:suppliers:import') && !user?.access?.deniedPermissions?.includes('suppliers:suppliers:import')));
   const [editing, setEditing] = useState<Supplier | null>(null);
   const [form, setForm] = useState({
     name: '',
@@ -131,7 +136,10 @@ export default function SuppliersPage() {
         title="Suppliers"
         description="Manage your supplier accounts"
         action={{ label: 'New Supplier', onClick: openCreate, icon: Plus }}
-      />
+      >
+        {canImport && <Button variant="outline" onClick={() => setShowImport(true)}><FileUp className="mr-2 h-4 w-4" />Import CSV</Button>}
+      </PageHeader>
+      <SupplierImportDialog open={showImport} onOpenChange={setShowImport} onImported={fetchSuppliers} />
       <div className="mb-4">
         <Input
           placeholder="Search suppliers..."
