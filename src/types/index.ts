@@ -240,6 +240,9 @@ export interface Warehouse {
   parent?: Warehouse;
   type?: 'COMPANY' | 'BRANCH' | 'ROOM' | 'BIN' | 'WAREHOUSE';
   companyId?: string;
+  branchId?: string;
+  plantId?: string;
+  stockType?: 'STORES' | 'WIP' | 'FINISHED_GOODS' | 'QC_HOLD' | 'REJECTED' | 'SCRAP' | 'GOODS_IN_TRANSIT' | 'SUPPLIER_JOB_WORKER';
   isDefault?: boolean;
   address?: string;
   city?: string;

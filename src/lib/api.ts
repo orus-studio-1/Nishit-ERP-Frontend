@@ -50,6 +50,10 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  if (config.method?.toUpperCase() === 'POST' && !config.headers['Idempotency-Key']) {
+    const key = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    config.headers['Idempotency-Key'] = key;
+  }
   return config;
 });
 
