@@ -36,8 +36,6 @@ export function Header({ onMenuClick }: HeaderProps) {
 
   useEffect(() => {
     void loadNotifications();
-    const timer = window.setInterval(() => void loadNotifications(), 60_000);
-    return () => window.clearInterval(timer);
   }, []);
 
   const openNotification = async (item: Notification) => {
