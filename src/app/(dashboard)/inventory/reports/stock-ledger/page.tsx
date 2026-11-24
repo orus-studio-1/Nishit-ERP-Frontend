@@ -1,25 +1,23 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import api from '@/lib/api';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
+import { Pagination } from '@/components/shared/Pagination';
+import { usePaginatedList } from '@/hooks/usePaginatedList';
 import { StockLedgerEntry } from '@/types';
 import { formatCurrency, formatDate } from '@/lib/utils';
-import { showApiError } from '@/lib/apiError';
+
+const LIMIT = 50;
+const NO_FILTERS = {};
 
 export default function StockLedgerReportPage() {
-  const [rows, setRows] = useState<StockLedgerEntry[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    setIsLoading(true);
-    api
-      .get('/inventory/reports/stock-ledger')
-      .then((res) => setRows(res.data?.data || []))
-      .catch((err) => showApiError(err, 'Failed to load stock ledger report'))
-      .finally(() => setIsLoading(false));
-  }, []);
+  // The report is paged on the server: the response is { items, total, page, limit }, not a plain list.
+  const { items: rows, total, page, setPage, isLoading, totalPages } = usePaginatedList<StockLedgerEntry>(
+    '/inventory/reports/stock-ledger',
+    NO_FILTERS,
+    [],
+    { limit: LIMIT, errorMessage: 'Failed to load stock ledger report' },
+  );
 
   return (
     <div className="space-y-4">
@@ -91,6 +89,9 @@ export default function StockLedgerReportPage() {
           },
         ]}
       />
+      {total > LIMIT && (
+        <Pagination page={page} totalPages={totalPages} total={total} limit={LIMIT} onPageChange={setPage} />
+      )}
     </div>
   );
 }
