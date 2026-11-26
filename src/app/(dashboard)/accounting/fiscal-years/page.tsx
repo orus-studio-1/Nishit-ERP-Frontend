@@ -14,12 +14,14 @@ import { StatusBadge } from '@/components/shared/StatusBadge';
 import { formatDate } from '@/lib/utils';
 import { showApiError, showApiSuccess } from '@/lib/apiError';
 import toast from 'react-hot-toast';
+import { YearEndCloseDialog } from '@/components/accounting/YearEndCloseDialog';
 
 export default function FiscalYearsPage() {
   const [years, setYears] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [togglingPeriodId, setTogglingPeriodId] = useState<string | null>(null);
+  const [closingYear, setClosingYear] = useState<{ id: string; name: string; startDate: string; endDate: string } | null>(null);
   const [form, setForm] = useState({
     name: '',
     startDate: '',
@@ -159,7 +161,17 @@ export default function FiscalYearsPage() {
             {
               key: 'status',
               header: 'Status',
-              render: (row: any) => <StatusBadge status={row.isClosed ? 'CANCELLED' : 'ACTIVE'} />,
+              render: (row: any) => <StatusBadge status={row.isClosed ? 'CANCELLED' : 'ACTIVE'} label={row.isClosed ? 'Closed' : 'Open'} />,
+            },
+            {
+              key: 'close',
+              header: '',
+              render: (row: { id: string; name: string; startDate: string; endDate: string; isClosed?: boolean }) =>
+                row.isClosed ? null : (
+                  <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setClosingYear(row); }}>
+                    Close year
+                  </Button>
+                ),
             },
             {
               key: 'periods',
@@ -186,6 +198,7 @@ export default function FiscalYearsPage() {
           ]}
         />
       )}
+      <YearEndCloseDialog year={closingYear} onOpenChange={(open) => { if (!open) setClosingYear(null); }} onClosed={load} />
     </div>
   );
 }

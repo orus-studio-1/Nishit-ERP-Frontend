@@ -74,7 +74,7 @@ export default function SalesInvoiceDetailPage() {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [printFormats, setPrintFormats] = useState<any[]>([]);
   const [printFormatId, setPrintFormatId] = useState('');
-  const [form, setForm] = useState({ customerId: '', date: '', dueDate: '', notes: '', terms: '', currency: 'INR' });
+  const [form, setForm] = useState({ customerId: '', date: '', dueDate: '', notes: '', terms: '', currency: 'INR', exchangeRate: '' });
   const [rows, setRows] = useState<LineItemRow[]>([]);
   const [payment, setPayment] = useState({ amount: '', date: new Date().toISOString().slice(0, 10), method: 'BANK_TRANSFER' as PaymentMethod, reference: '', notes: '' });
 
@@ -95,6 +95,7 @@ export default function SalesInvoiceDetailPage() {
         notes: next.notes || '',
         terms: next.terms || '',
         currency: next.currency || 'INR',
+        exchangeRate: next.exchangeRate && Number(next.exchangeRate) !== 1 ? String(Number(next.exchangeRate)) : '',
       });
       setRows(toRows(next));
       setPayment(prev => ({ ...prev, amount: String(Math.max(invoiceOutstanding(next), 0)) }));
@@ -122,6 +123,7 @@ export default function SalesInvoiceDetailPage() {
     try {
       const payload = {
         ...form,
+        exchangeRate: form.currency === 'INR' ? 1 : form.exchangeRate || undefined,
         items: rows.filter(row => row.productId || row.itemCode || row.description).map(row => ({
           productId: row.productId,
           itemCode: row.itemCode,
@@ -234,7 +236,7 @@ export default function SalesInvoiceDetailPage() {
           </Button>
           <div className="flex flex-wrap items-center gap-2">
             <h1 className={isCancelled(invoice.status) ? 'text-xl font-semibold text-[#1f2937] line-through' : 'text-xl font-semibold text-[#1f2937]'}>{invoice.invoiceNo}</h1>
-            <StatusBadge status={invoice.status} />
+            <StatusBadge status={invoice.status} label={invoice.status === 'SENT' ? 'Submitted' : undefined} />
           </div>
           {invoice.salesOrderId && (
             <Link href={`/sales/orders/${invoice.salesOrderId}`} className="mt-1 inline-flex text-sm text-[#1674c4] hover:underline">
@@ -282,6 +284,11 @@ export default function SalesInvoiceDetailPage() {
                     onChange={(currency) => setForm(prev => ({ ...prev, currency }))}
                   />
                 </Field>
+                {form.currency !== 'INR' && (
+                  <Field label={`Exchange rate (₹ per 1 ${form.currency})`} value={Number(invoice.exchangeRate || 1) === 1 ? 'Not set' : String(Number(invoice.exchangeRate))} readOnly={readOnly}>
+                    <Input type="number" min="0" step="0.0001" placeholder="e.g. 84.25" value={form.exchangeRate} onChange={event => setForm(prev => ({ ...prev, exchangeRate: event.target.value }))} />
+                  </Field>
+                )}
                 <Field label="Date" value={formatDate(invoice.date)} readOnly={readOnly}>
                   <Input type="date" value={form.date} onChange={event => setForm(prev => ({ ...prev, date: event.target.value }))} />
                 </Field>
@@ -379,6 +386,14 @@ export default function SalesInvoiceDetailPage() {
               <SummaryLine label="Paid" value={formatCurrency(Number(invoice.amountPaid || 0), invoice.currency)} />
               <SummaryLine label="Outstanding" value={formatCurrency(outstanding, invoice.currency)} strong danger={outstanding > 0} />
             </div>
+            {invoice.currency !== 'INR' && (
+              <div className="border-t border-[#f0ede8] pt-3">
+                <SummaryLine label="Exchange rate" value={Number(invoice.exchangeRate || 1) === 1 ? 'Not set' : `₹${Number(invoice.exchangeRate)} / ${invoice.currency}`} />
+                {Number(invoice.exchangeRate || 1) !== 1 && (
+                  <SummaryLine label="Total in INR (books)" value={formatCurrency((readOnly ? invoiceTotal(invoice) : summary.total) * Number(invoice.exchangeRate), 'INR')} strong />
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
         <Card>

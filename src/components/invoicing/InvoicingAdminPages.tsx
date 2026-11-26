@@ -669,6 +669,20 @@ function CreditRows({ rows, onChange, currency }: { rows: any[]; onChange: (rows
   );
 }
 
+type LedgerRow = { debit?: number | string; credit?: number | string; debitBase?: number | string; creditBase?: number | string; currency?: string; exchangeRate?: number; isCancelled?: boolean };
+
+function LedgerAmount({ entry, side }: { entry: LedgerRow; side: 'debit' | 'credit' }) {
+  const original = Number(entry[side] || 0);
+  const base = Number((side === 'debit' ? entry.debitBase : entry.creditBase) ?? entry[side] ?? 0);
+  const foreign = entry.currency && entry.currency !== 'INR' && original !== 0;
+  return (
+    <div className={entry.isCancelled ? 'text-[#9ca3af] line-through' : undefined}>
+      <p>{formatCurrency(base, 'INR')}</p>
+      {foreign && <p className="text-xs text-[#6b7280]">{formatCurrency(original, entry.currency)} @ {Number(entry.exchangeRate || 1)}</p>}
+    </div>
+  );
+}
+
 export function LedgerPage() {
   const [entries, setEntries] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -697,9 +711,19 @@ export function LedgerPage() {
             header: 'Account',
             render: (e: any) => (e.account ? `${e.account.code} - ${e.account.name}` : e.accountId),
           },
-          { key: 'voucherType', header: 'Voucher Type' },
-          { key: 'debit', header: 'Debit', render: (e: any) => formatCurrency(e.debit, e.currency) },
-          { key: 'credit', header: 'Credit', render: (e: any) => formatCurrency(e.credit, e.currency) },
+          {
+            key: 'voucherType',
+            header: 'Voucher',
+            render: (e: LedgerRow & { voucherNo?: string | null; voucherId: string; voucherType: string }) => (
+              <div>
+                <p className="font-medium">{e.voucherNo || e.voucherId}</p>
+                <p className="text-xs text-[#6b7280]">{String(e.voucherType).replace(/_/g, ' ')}{e.isCancelled ? ' · cancelled' : ''}</p>
+              </div>
+            ),
+          },
+          // Amounts are the rupee values the books use; foreign-currency lines also show the original amount.
+          { key: 'debit', header: 'Debit (INR)', render: (e: any) => <LedgerAmount entry={e} side="debit" /> },
+          { key: 'credit', header: 'Credit (INR)', render: (e: any) => <LedgerAmount entry={e} side="credit" /> },
           { key: 'remarks', header: 'Remarks', render: (e: any) => e.remarks || '-' },
         ]}
       />

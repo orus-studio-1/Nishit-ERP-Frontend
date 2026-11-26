@@ -71,7 +71,7 @@ export default function AccountingReportsPage() {
             header: 'Account',
             render: (r: any) => (r.account ? `${r.account.code} - ${r.account.name}` : r.accountId),
           },
-          { key: 'voucher', header: 'Voucher', render: (r: any) => `${r.voucherType} / ${r.voucherId}` },
+          { key: 'voucher', header: 'Voucher', render: (r: any) => `${r.voucherNo || r.voucherId} (${String(r.voucherType).replace(/_/g, ' ')})` },
           {
             key: 'debit',
             header: 'Debit',
@@ -103,13 +103,19 @@ export default function AccountingReportsPage() {
           },
           {
             key: 'amount',
-            header: 'Amount',
+            header: active === 'trial' ? 'Balance' : 'Amount',
             render: (r: any) =>
-              formatCurrency(
-                r.amount ?? r.balance ?? r.outstanding ?? r.actual ?? r.netCashFlow ?? 0
-              ),
+              active === 'trial'
+                ? (r.balanceSide ? `${formatCurrency(Math.abs(r.balance))} ${r.balanceSide}` : formatCurrency(0))
+                : formatCurrency(r.amount ?? r.balance ?? r.outstanding ?? r.actual ?? r.netCashFlow ?? 0),
           },
         ];
+
+  // Trial Balance totals: total debits must equal total credits.
+  const trialTotals = active === 'trial' && hasGenerated
+    ? rows.reduce((t: { debit: number; credit: number }, r: { debit?: number; credit?: number }) => ({ debit: t.debit + Number(r.debit || 0), credit: t.credit + Number(r.credit || 0) }), { debit: 0, credit: 0 })
+    : null;
+  const trialBalanced = trialTotals ? Math.abs(trialTotals.debit - trialTotals.credit) < 0.005 : false;
 
   return (
     <div className="space-y-4">
@@ -186,6 +192,18 @@ export default function AccountingReportsPage() {
               columns={columns}
               isLoading={isLoading}
             />
+
+            {key === 'trial' && trialTotals && rows.length > 0 && (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#e5e2dc] bg-[#f8faf9] px-4 py-3 text-sm">
+                <div className="flex flex-wrap gap-6">
+                  <span>Total debit <b className="ml-1">{formatCurrency(trialTotals.debit)}</b></span>
+                  <span>Total credit <b className="ml-1">{formatCurrency(trialTotals.credit)}</b></span>
+                </div>
+                <span className={`rounded-full border px-2.5 py-0.5 text-xs font-medium ${trialBalanced ? 'border-[#bbf7d0] bg-[#f0fdf4] text-[#166534]' : 'border-[#fecaca] bg-[#fef2f2] text-[#991b1b]'}`}>
+                  {trialBalanced ? 'Balanced' : `Out of balance by ${formatCurrency(Math.abs(trialTotals.debit - trialTotals.credit))}`}
+                </span>
+              </div>
+            )}
 
             {!isLoading && hasGenerated && rows.length === 0 && (
               <p className="text-center text-xs text-gray-500 py-4">

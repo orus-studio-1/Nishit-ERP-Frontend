@@ -96,6 +96,12 @@ export function ReportWorkbench({
       <div className="grid gap-3 md:grid-cols-4">
         {kpis.map(kpi => <Kpi key={kpi.key} label={kpi.label} value={totals[kpi.key] || 0} money={kpi.money} />)}
       </div>
+      <p className="-mt-2 text-xs text-[#6b7280]">Amounts are in INR. Invoices in other currencies are converted at each invoice&apos;s exchange rate.</p>
+      {Number(totals.invoicesWithoutExchangeRate || 0) > 0 && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          {totals.invoicesWithoutExchangeRate} foreign-currency invoice(s) in this report have no exchange rate, so they are counted at 1:1 and the INR totals are not reliable for them.
+        </div>
+      )}
 
       <Card>
         <CardHeader><CardTitle>Filters</CardTitle></CardHeader>

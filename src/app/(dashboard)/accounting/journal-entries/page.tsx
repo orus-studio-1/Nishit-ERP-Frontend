@@ -163,6 +163,36 @@ export default function JournalEntriesPage() {
     }
   };
 
+  // A draft can be deleted; a posted entry can only be cancelled (which reverses its ledger
+  // lines); a cancelled entry is kept as the record of that reversal.
+  const handleDelete = async (entry: JournalEntry) => {
+    if (postingId || !confirm(`Delete draft journal entry ${entry.entryNumber}? This cannot be undone.`)) return;
+    setPostingId(entry.id);
+    try {
+      await api.delete(`/accounting/journal-entries/${entry.id}`);
+      showApiSuccess('Draft journal entry deleted');
+      fetchAll();
+    } catch (err) {
+      showApiError(err, 'Failed to delete journal entry');
+    } finally {
+      setPostingId(null);
+    }
+  };
+
+  const handleCancel = async (entry: JournalEntry) => {
+    if (postingId || !confirm(`Cancel journal entry ${entry.entryNumber}? Its ledger entries will be reversed. The entry is kept for the audit trail.`)) return;
+    setPostingId(entry.id);
+    try {
+      await api.put(`/accounting/journal-entries/${entry.id}/cancel`);
+      showApiSuccess('Journal entry cancelled and reversed in the General Ledger');
+      fetchAll();
+    } catch (err) {
+      showApiError(err, 'Failed to cancel journal entry');
+    } finally {
+      setPostingId(null);
+    }
+  };
+
   const columns = [
     {
       key: 'entryNumber',
@@ -179,16 +209,44 @@ export default function JournalEntriesPage() {
       header: '',
       render: (e: JournalEntry) =>
         e.status === 'DRAFT' ? (
-          <Button
-            size="sm"
-            disabled={postingId === e.id}
-            onClick={(ev) => {
-              ev.stopPropagation();
-              handlePost(e.id);
-            }}
-          >
-            {postingId === e.id ? 'Posting...' : 'Post'}
-          </Button>
+          <div className="flex justify-end gap-2">
+            <Button
+              size="sm"
+              disabled={postingId === e.id}
+              onClick={(ev) => {
+                ev.stopPropagation();
+                handlePost(e.id);
+              }}
+            >
+              {postingId === e.id ? 'Working...' : 'Post'}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={postingId === e.id}
+              onClick={(ev) => {
+                ev.stopPropagation();
+                void handleDelete(e);
+              }}
+            >
+              Delete
+            </Button>
+          </div>
+        ) : e.status === 'POSTED' ? (
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-red-200 text-red-700 hover:bg-red-50"
+              disabled={postingId === e.id}
+              onClick={(ev) => {
+                ev.stopPropagation();
+                void handleCancel(e);
+              }}
+            >
+              {postingId === e.id ? 'Cancelling...' : 'Cancel'}
+            </Button>
+          </div>
         ) : null,
     },
   ];

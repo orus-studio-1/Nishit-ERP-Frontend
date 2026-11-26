@@ -37,6 +37,15 @@ export default function OutstandingReportPage() {
         { key: 'total', header: 'Total', render: (invoice: any) => formatCurrency(Number(invoice.total || invoice.grandTotal || 0), invoice.currency) },
         { key: 'amountPaid', header: 'Paid', render: (invoice: any) => formatCurrency(Number(invoice.amountPaid || 0), invoice.currency) },
         { key: 'outstandingAmount', header: 'Outstanding', render: (invoice: any) => <span className="font-semibold">{formatCurrency(Number(invoice.outstandingAmount || 0), invoice.currency)}</span> },
+        {
+          key: 'baseOutstandingAmount',
+          header: 'Outstanding (INR)',
+          render: (invoice: { exchangeRateMissing?: boolean; baseOutstandingAmount?: number; outstandingAmount?: number }) => (
+            <span className={invoice.exchangeRateMissing ? 'text-amber-700' : undefined} title={invoice.exchangeRateMissing ? 'No exchange rate on this invoice; counted at 1:1' : undefined}>
+              {formatCurrency(Number(invoice.baseOutstandingAmount ?? invoice.outstandingAmount ?? 0), 'INR')}{invoice.exchangeRateMissing ? ' *' : ''}
+            </span>
+          ),
+        },
       ]}
     />
   );

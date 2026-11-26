@@ -18,7 +18,7 @@ import toast from 'react-hot-toast';
 const statuses: Array<{ label: string; value: '' | InvoiceStatus }> = [
   { label: 'All', value: '' },
   { label: 'Draft', value: 'DRAFT' },
-  { label: 'Sent', value: 'SENT' },
+  { label: 'Submitted', value: 'SENT' },
   { label: 'Partial', value: 'PARTIAL' },
   { label: 'Paid', value: 'PAID' },
   { label: 'Overdue', value: 'OVERDUE' },
@@ -371,7 +371,7 @@ function InvoiceDeskTable({ invoices, isLoading }: { invoices: SalesInvoice[]; i
                 )}
               </td>
               <td className="px-3 py-2 text-[#374151]">{invoice.customer?.name || '-'}</td>
-              <td className="px-3 py-2"><StatusBadge status={invoice.status} /></td>
+              <td className="px-3 py-2"><StatusBadge status={invoice.status} label={invoice.status === 'SENT' ? 'Submitted' : undefined} /></td>
               <td className="px-3 py-2 text-right font-medium">{formatCurrency(invoiceTotal(invoice), invoice.currency)}</td>
               <td className="px-3 py-2 text-right">{formatCurrency(Number(invoice.amountPaid || 0), invoice.currency)}</td>
               <td className="px-3 py-2 text-right font-semibold text-[#c3423f]">{formatCurrency(invoiceOutstanding(invoice), invoice.currency)}</td>

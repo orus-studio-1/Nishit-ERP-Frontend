@@ -17,10 +17,14 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 import { showApiError, showApiSuccess } from '@/lib/apiError';
 import toast from 'react-hot-toast';
 
+type GlCandidate = { id: string; postingDate: string; voucherNo?: string | null; voucherType: string; debitBase?: number | string; creditBase?: number | string };
+type StatementAmount = { debit?: number | string | null; credit?: number | string | null };
+
 export default function BankReconciliationPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [lines, setLines] = useState<any[]>([]);
-  const [gl, setGl] = useState<any[]>([]);
+  // Book vs bank summary and the unmatched ledger entries of the chosen bank account.
+  const [summary, setSummary] = useState<{ bookBalance: number; bankBalance: number; difference: number; matchedLines: number; totalLines: number; unreconciledGL: GlCandidate[] } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [reconcilingLineId, setReconcilingLineId] = useState<string | null>(null);
@@ -36,14 +40,13 @@ export default function BankReconciliationPage() {
   const load = async () => {
     setIsLoading(true);
     try {
-      const [a, l, g] = await Promise.all([
+      const [a, l] = await Promise.all([
         api.get('/accounting/accounts'),
         api.get('/accounting/bank-statement-lines'),
-        api.get('/accounting/gl-entries', { params: { limit: 100 } }),
       ]);
       setAccounts(a.data?.data || []);
       setLines(l.data?.data || []);
-      setGl(g.data?.data?.items || []);
+      await loadSummary(form.accountId);
     } catch (err: any) {
       showApiError(err, 'Failed to load reconciliation data');
     } finally {
@@ -51,9 +54,23 @@ export default function BankReconciliationPage() {
     }
   };
 
+  const loadSummary = async (accountId: string) => {
+    if (!accountId) { setSummary(null); return; }
+    try {
+      const res = await api.get('/accounting/reports/bank-reconciliation', { params: { accountId } });
+      setSummary(res.data?.data || null);
+    } catch (err) {
+      showApiError(err, 'Failed to load the reconciliation summary');
+    }
+  };
+
   useEffect(() => {
     load();
   }, []);
+
+  useEffect(() => {
+    void loadSummary(form.accountId);
+  }, [form.accountId]);
 
   const create = async () => {
     if (isSubmitting) return;
@@ -112,7 +129,12 @@ export default function BankReconciliationPage() {
   };
 
   const bankAccounts = accounts.filter((a) => a.isActive && !a.isGroup);
-  const openGlEntries = gl.filter((e) => e.reconciliationStatus !== 'RECONCILED');
+  const openGlEntries = summary?.unreconciledGL || [];
+  const accountLines = form.accountId ? lines.filter((l) => l.accountId === form.accountId) : lines;
+  const amountOf = (row: StatementAmount) => Number(row.debit ?? 0) - Number(row.credit ?? 0);
+  const glAmountOf = (e: GlCandidate) => Number(e.debitBase || 0) - Number(e.creditBase || 0);
+  // Ledger entries with the same amount as the statement line are listed first.
+  const candidatesFor = (line: StatementAmount) => [...openGlEntries].sort((x, y) => Number(Math.abs(glAmountOf(x) - amountOf(line)) > 0.005) - Number(Math.abs(glAmountOf(y) - amountOf(line)) > 0.005));
 
   return (
     <div className="space-y-4">
@@ -202,7 +224,25 @@ export default function BankReconciliationPage() {
         </div>
       </div>
 
-      {lines.length === 0 && !isLoading ? (
+      {form.accountId && summary ? (
+        <div className="grid gap-3 md:grid-cols-4">
+          {[
+            ['Book balance (ledger)', formatCurrency(summary.bookBalance)],
+            ['Bank statement balance', formatCurrency(summary.bankBalance)],
+            ['Difference', formatCurrency(summary.difference)],
+            ['Matched lines', `${summary.matchedLines} of ${summary.totalLines}`],
+          ].map(([label, value]) => (
+            <div key={label} className={`rounded-md border bg-white p-3 shadow-xs ${label === 'Difference' && Math.abs(summary.difference) > 0.005 ? 'border-amber-300' : 'border-[#e5e2dc]'}`}>
+              <p className="text-xs font-medium text-[#6b7280]">{label}</p>
+              <p className="text-lg font-semibold text-gray-900">{value}</p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-[#6b7280]">Choose a bank account above to see the book vs bank balance and match its statement lines.</p>
+      )}
+
+      {accountLines.length === 0 && !isLoading ? (
         <EmptyState
           icon={ShieldCheck}
           title="No statement lines"
@@ -210,7 +250,7 @@ export default function BankReconciliationPage() {
         />
       ) : (
         <DataTable
-          data={lines}
+          data={accountLines}
           isLoading={isLoading}
           columns={[
             { key: 'date', header: 'Date', render: (r: any) => formatDate(r.statementDate) },
@@ -240,6 +280,8 @@ export default function BankReconciliationPage() {
               render: (r: any) =>
                 r.isReconciled ? (
                   <span className="text-xs text-gray-400">Reconciled</span>
+                ) : r.accountId !== form.accountId ? (
+                  <span className="text-xs text-gray-400">Choose this line&apos;s account above to match it</span>
                 ) : (
                   <Select
                     disabled={reconcilingLineId === r.id}
@@ -256,10 +298,10 @@ export default function BankReconciliationPage() {
                           linkText="Create Entry"
                         />
                       ) : (
-                        openGlEntries.map((e) => (
+                        candidatesFor(r).map((e) => (
                           <SelectItem key={e.id} value={e.id}>
-                            {formatDate(e.postingDate)} {e.account?.name}{' '}
-                            {formatCurrency(Number(e.debitBase || 0) - Number(e.creditBase || 0))}
+                            {formatDate(e.postingDate)} · {e.voucherNo || String(e.voucherType).replace(/_/g, ' ')} · {formatCurrency(glAmountOf(e))}
+                            {Math.abs(glAmountOf(e) - amountOf(r)) <= 0.005 ? ' ✓ same amount' : ''}
                           </SelectItem>
                         ))
                       )}

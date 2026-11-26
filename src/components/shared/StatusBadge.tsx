@@ -69,13 +69,15 @@ const statusConfig: Record<string, { label: string; className: string }> = {
 interface StatusBadgeProps {
   status: string;
   className?: string;
+  /** Overrides the default label, e.g. to word a status differently on one screen. */
+  label?: string;
 }
 
-export function StatusBadge({ status, className }: StatusBadgeProps) {
+export function StatusBadge({ status, className, label }: StatusBadgeProps) {
   const config = statusConfig[status] || { label: status, className: 'bg-gray-100 text-gray-600 border-gray-200' };
   return (
     <span className={cn('inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium', config.className, className)}>
-      {config.label}
+      {label || config.label}
     </span>
   );
 }

@@ -34,6 +34,7 @@ export default function NewSalesInvoicePage() {
     date: new Date().toISOString().slice(0, 10),
     dueDate: '',
     currency: 'INR',
+    exchangeRate: '',
     notes: '',
     terms: '',
   });
@@ -120,7 +121,7 @@ export default function NewSalesInvoicePage() {
         ? await api.post(`/invoices/from-sales-order/${sourceOrder.id}`, {
             items: rows.filter((row) => row.id && Number(row.quantity) > 0).map((row) => ({ salesOrderItemId: row.id, quantity: Number(row.quantity) })),
           })
-        : await api.post('/invoices', { ...form, items });
+        : await api.post('/invoices', { ...form, exchangeRate: form.currency === 'INR' ? undefined : form.exchangeRate || undefined, items });
       const invoice = res.data?.data;
       showApiSuccess('Draft invoice created successfully');
       router.push(`/invoicing/sales-invoices/${invoice.id}`);
@@ -212,6 +213,20 @@ export default function NewSalesInvoicePage() {
                 onChange={(currency) => setForm((prev) => ({ ...prev, currency }))}
               />
             </div>
+            {form.currency !== 'INR' && (
+              <div className="space-y-1.5">
+                <Label>Exchange rate (₹ per 1 {form.currency}) *</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.0001"
+                  placeholder="e.g. 84.25"
+                  value={form.exchangeRate}
+                  onChange={(event) => setForm((prev) => ({ ...prev, exchangeRate: event.target.value }))}
+                />
+                <p className="text-xs text-[#6b7280]">The invoice is booked in the accounts at its rupee value using this rate.</p>
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label>Date</Label>
               <Input

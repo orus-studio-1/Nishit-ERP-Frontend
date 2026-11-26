@@ -695,6 +695,8 @@ export interface SalesOrder {
 export interface SalesInvoice {
   id: string;
   invoiceNo: string;
+  /** Rupees per 1 unit of `currency` (1 for INR invoices). */
+  exchangeRate?: number | string;
   customerId: string;
   customer?: { name: string; email?: string };
   createdBy?: { id: string; firstName: string; lastName: string; email: string };
